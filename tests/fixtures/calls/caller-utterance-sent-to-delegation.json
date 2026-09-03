@@ -1,0 +1,76 @@
+{
+  "name": "caller-utterance-sent-to-delegation",
+  "note": "V02-01. A ConversationText with role=user is captured as lastCallerUtterance and sent as caller_utterance on every ask() in the following FunctionCallRequest batch — including both calls in a two-function batch.",
+  "delegation": {
+    "responses": [
+      {
+        "text": "We have 4 units available in that size.",
+        "transfer": false
+      },
+      {
+        "text": "A 10 by 10 is one hundred twenty a month.",
+        "transfer": false
+      }
+    ]
+  },
+  "events": [
+    { "at": 0, "from": "agentSocket", "kind": "open" },
+    { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
+    { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
+    {
+      "at": 50,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "user",
+        "content": "so if I wanted, like, the ten square meter one, roughly what would that run me monthly, and is there one available this week"
+      }
+    },
+    {
+      "at": 100,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "FunctionCallRequest",
+        "functions": [
+          {
+            "id": "fc_1",
+            "name": "ask_keevaris",
+            "arguments": "{\"query\":\"price of 10m2 unit monthly\"}",
+            "client_side": true
+          },
+          {
+            "id": "fc_2",
+            "name": "ask_keevaris",
+            "arguments": "{\"query\":\"availability of 10m2 unit this week\"}",
+            "client_side": true
+          }
+        ]
+      }
+    },
+    { "at": 200, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } },
+    { "at": 300, "from": "agentSocket", "kind": "audio", "bytes": 320 },
+    { "at": 400, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } }
+  ],
+  "expect": [
+    {
+      "on": "delegation",
+      "kind": "ask",
+      "callerUtterance": "so if I wanted, like, the ten square meter one, roughly what would that run me monthly, and is there one available this week"
+    },
+    {
+      "on": "delegation",
+      "kind": "ask",
+      "callerUtterance": "so if I wanted, like, the ten square meter one, roughly what would that run me monthly, and is there one available this week"
+    },
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage" },
+    { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse", "functionCallId": "fc_1" },
+    { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse", "functionCallId": "fc_2" }
+  ],
+  "count": [
+    { "on": "delegation", "kind": "ask", "exactly": 2 },
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "exactly": 2 },
+    { "on": "transport", "kind": "transfer", "exactly": 0 }
+  ]
+}

@@ -14,14 +14,16 @@ const requestSchema = z.object({
   query: z.string(),
   turn_id: z.string(),
   session_id: z.string(),
-  caller_number: z.string().nullable()
+  caller_number: z.string().nullable(),
+  caller_utterance: z.string().nullable()
 })
 
 const request = {
   query: 'what are your hours?',
   turn_id: 'fc_1',
   session_id: 'sess_contract',
-  caller_number: '+15555550100'
+  caller_number: '+15555550100',
+  caller_utterance: 'what are your hours, like, today?'
 }
 
 const originalFetch = globalThis.fetch

@@ -61,6 +61,7 @@ export class VoiceSession {
   private speech: SpeechKind = 'nothing'
   private readonly upcomingSpeech: Array<SpokenKind> = []
   private transferDispatched = false
+  private lastCallerUtterance: string | undefined
   /**
    * Set only by `transport.onClose`. `'error'` as a close reason is
    * ambiguous — both a dead Twilio socket and a dead Deepgram socket
@@ -125,6 +126,9 @@ export class VoiceSession {
         this.deps.transport.clearAudio()
         break
       case 'transcript':
+        if (event.role === 'user') {
+          this.lastCallerUtterance = event.text
+        }
         this.log.info(
           { sessionId: this.deps.transport.sessionId, role: event.role, text: event.text },
           'session.transcript'
@@ -192,7 +196,8 @@ export class VoiceSession {
           query: entry.query,
           turn_id: entry.call.id,
           session_id: sessionId,
-          caller_number: transport.callerNumber
+          caller_number: transport.callerNumber,
+          caller_utterance: this.lastCallerUtterance ?? null
         })
 
         this.log.info(

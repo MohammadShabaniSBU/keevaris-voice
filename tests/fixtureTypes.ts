@@ -20,18 +20,19 @@ const closeReasonSchema = z.enum([
 ])
 
 export const logMatcherSchema = z.object({
-  on: z.enum(['transport', 'agentSocket', 'session']),
+  on: z.enum(['transport', 'agentSocket', 'session', 'delegation']),
   kind: z.string(),
   messageType: z.string().optional(),
   functionCallId: z.string().optional(),
   content: z.string().optional(),
   bytes: z.number().optional(),
   reason: z.string().optional(),
-  destinationNumber: z.string().optional()
+  destinationNumber: z.string().optional(),
+  callerUtterance: z.string().nullable().optional()
 })
 
 const contentGuardSchema = z.object({
-  on: z.enum(['transport', 'agentSocket', 'session']),
+  on: z.enum(['transport', 'agentSocket', 'session', 'delegation']),
   kind: z.string(),
   messageType: z.string().optional(),
   functionCallId: z.string().optional(),

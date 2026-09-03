@@ -108,7 +108,7 @@ export async function runFixture(fixture: CallFixture, t: TestContext): Promise<
   })
 
   let socket: DeepgramSocketDouble | undefined
-  const keevaris = new KeevarisClientStub(fixture.delegation)
+  const keevaris = new KeevarisClientStub(fixture.delegation, log)
 
   if (fixture.preState?.transportClosed !== undefined) {
     transport.simulateClose(fixture.preState.transportClosed)

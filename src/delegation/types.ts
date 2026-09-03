@@ -7,6 +7,7 @@ export interface DelegationRequest {
   turn_id: string
   session_id: string
   caller_number: string | null
+  caller_utterance: string | null
 }
 
 /**

@@ -3,6 +3,7 @@ import type {
   DelegationRequest,
   DelegationResponse
 } from '../../src/delegation/types.js'
+import type { EventLog } from './EventLog.js'
 
 export interface KeevarisClientStubConfig {
   delayMs?: number
@@ -23,9 +24,20 @@ const DEFAULT_RESPONSE: DelegationResponse = {
 export class KeevarisClientStub implements DelegationClient {
   private nextResponseIndex = 0
 
-  constructor(private readonly config: KeevarisClientStubConfig = {}) {}
+  constructor(
+    private readonly config: KeevarisClientStubConfig = {},
+    private readonly log?: EventLog
+  ) {}
 
-  ask(_request: DelegationRequest): Promise<DelegationResponse> {
+  ask(request: DelegationRequest): Promise<DelegationResponse> {
+    this.log?.push({
+      on: 'delegation',
+      kind: 'ask',
+      callerUtterance: request.caller_utterance,
+      query: request.query,
+      turnId: request.turn_id
+    })
+
     if (this.config.reject === true) {
       return Promise.reject(new Error('delegation stub rejected'))
     }
