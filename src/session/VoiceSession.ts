@@ -1,6 +1,8 @@
 import type { AgentEvent } from '../agent/AgentProvider.js'
+import { config } from '../config.js'
 import { logger } from '../logger.js'
 import { runTransfer } from '../transfer/TransferPolicy.js'
+import type { TransportCloseReason } from '../transport/Transport.js'
 import type { VoiceSessionDeps } from './types.js'
 
 /**
@@ -14,6 +16,10 @@ interface AskKeevarisArguments {
   query?: string
 }
 
+type SessionState =
+  | { status: 'connecting' | 'active' | 'closing' | 'closed' }
+  | { status: 'transferring'; destination: string | undefined }
+
 /**
  * One call, start to finish. Wires the Transport (audio in/out, barge-in,
  * transfer) to the AgentProvider (fast conversation, function calls) and
@@ -24,9 +30,9 @@ interface AskKeevarisArguments {
  */
 export class VoiceSession {
   private readonly log
-  private transferPending = false
-  private transferDestination: string | undefined
-  private closing = false
+  private state: SessionState = { status: 'connecting' }
+  private durationCapTimer: ReturnType<typeof setTimeout> | undefined
+  private idleTimer: ReturnType<typeof setTimeout> | undefined
 
   constructor(private readonly deps: VoiceSessionDeps) {
     this.log = logger.child({
@@ -38,17 +44,25 @@ export class VoiceSession {
   async start(): Promise<void> {
     const { transport, agent } = this.deps
 
-    transport.onAudio((chunk) => agent.sendAudio(chunk))
+    this.armDurationCap()
+    this.resetIdleTimer()
+
+    transport.onAudio((chunk) => {
+      this.resetIdleTimer()
+      agent.sendAudio(chunk)
+    })
     transport.onClose((reason) => {
       this.log.info({ sessionId: transport.sessionId, reason }, 'session.transport_closed')
-      this.closing = true
-      void agent.close()
+      void this.teardown(reason)
     })
 
     agent.onEvent((event) => this.handleAgentEvent(event))
 
     try {
       await agent.start(transport.audioInput, transport.audioOutput)
+      if (this.state.status === 'connecting') {
+        this.state = { status: 'active' }
+      }
       this.log.info(
         { sessionId: transport.sessionId, callerNumber: transport.callerNumber },
         'session.started'
@@ -58,13 +72,14 @@ export class VoiceSession {
         { sessionId: transport.sessionId, error: (error as Error).message },
         'session.agent_start_failed'
       )
-      await transport.close('error')
+      await this.teardown('error')
     }
   }
 
   private handleAgentEvent(event: AgentEvent): void {
     switch (event.type) {
       case 'audio':
+        this.resetIdleTimer()
         this.deps.transport.sendAudio(event.chunk)
         break
       case 'userStartedSpeaking':
@@ -87,16 +102,14 @@ export class VoiceSession {
           { sessionId: this.deps.transport.sessionId, message: event.message },
           'session.agent_error'
         )
+        void this.teardown('error')
         break
       case 'closed':
         this.log.info(
           { sessionId: this.deps.transport.sessionId, reason: event.reason },
           'session.agent_closed'
         )
-        if (!this.closing) {
-          this.closing = true
-          void this.deps.transport.close('error')
-        }
+        void this.teardown('error')
         break
       default:
         break
@@ -135,9 +148,8 @@ export class VoiceSession {
       'session.delegation_result'
     )
 
-    if (result.transfer) {
-      this.transferPending = true
-      this.transferDestination = result.destination
+    if (result.transfer && (this.state.status === 'active' || this.state.status === 'connecting')) {
+      this.state = { status: 'transferring', destination: result.destination }
     }
 
     agent.respondToFunctionCall(id, name, result.text)
@@ -149,15 +161,56 @@ export class VoiceSession {
    * hears the full transfer sentence before the line moves.
    */
   private async handleAgentAudioDone(): Promise<void> {
-    if (!this.transferPending) {
+    if (this.state.status !== 'transferring') {
       return
     }
 
-    this.transferPending = false
-    this.closing = true
-
+    const destination = this.state.destination
     const { transport } = this.deps
-    await runTransfer(transport, this.transferDestination, transport.sessionId)
-    await this.deps.agent.close()
+    await runTransfer(transport, destination, transport.sessionId)
+    await this.teardown('transferred')
+  }
+
+  private async teardown(reason: TransportCloseReason): Promise<void> {
+    if (this.state.status === 'closing' || this.state.status === 'closed') {
+      return
+    }
+
+    this.state = { status: 'closing' }
+    this.clearTimers()
+    await Promise.allSettled([this.deps.transport.close(reason), this.deps.agent.close()])
+    this.state = { status: 'closed' }
+  }
+
+  private armDurationCap(): void {
+    this.durationCapTimer = setTimeout(() => {
+      void this.teardown('duration_cap')
+    }, config.session.maxCallMs)
+  }
+
+  private resetIdleTimer(): void {
+    if (this.state.status === 'closing' || this.state.status === 'closed') {
+      return
+    }
+
+    if (this.idleTimer !== undefined) {
+      clearTimeout(this.idleTimer)
+    }
+
+    this.idleTimer = setTimeout(() => {
+      void this.teardown('idle_timeout')
+    }, config.session.idleTimeoutMs)
+  }
+
+  private clearTimers(): void {
+    if (this.durationCapTimer !== undefined) {
+      clearTimeout(this.durationCapTimer)
+      this.durationCapTimer = undefined
+    }
+
+    if (this.idleTimer !== undefined) {
+      clearTimeout(this.idleTimer)
+      this.idleTimer = undefined
+    }
   }
 }

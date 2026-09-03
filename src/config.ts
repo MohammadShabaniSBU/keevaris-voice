@@ -13,6 +13,8 @@ const envSchema = z.object({
   DEEPGRAM_THINK_MODEL: z.string().default('gpt-4o-mini'),
   DEEPGRAM_LISTEN_MODEL: z.string().default('flux-general-en'),
   DEEPGRAM_SPEAK_MODEL: z.string().default('aura-2-thalia-en'),
+  // 8s per https://developers.deepgram.com/docs/agent-keep-alive
+  DEEPGRAM_KEEPALIVE_INTERVAL_MS: z.coerce.number().int().positive().default(8_000),
 
   KEEVARIS_API_URL: z.string().url(),
   KEEVARIS_BRIDGE_TOKEN: z.string().min(1, 'KEEVARIS_BRIDGE_TOKEN is required'),
@@ -40,7 +42,9 @@ const envSchema = z.object({
   WEB_TOKEN_SECRET: z.string().min(1, 'WEB_TOKEN_SECRET is required'),
   WEB_TOKEN_TTL_MS: z.coerce.number().int().positive().default(300_000),
   CALL_REGISTRY_TTL_MS: z.coerce.number().int().positive().default(60_000),
-  MAX_CONCURRENT_SESSIONS: z.coerce.number().int().positive().default(20)
+  MAX_CONCURRENT_SESSIONS: z.coerce.number().int().positive().default(20),
+  MAX_CALL_SECONDS: z.coerce.number().int().positive().default(1800),
+  IDLE_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(300)
 })
 
 export type Env = z.infer<typeof envSchema>
@@ -68,7 +72,9 @@ export const config = {
     thinkProvider: env.DEEPGRAM_THINK_PROVIDER,
     thinkModel: env.DEEPGRAM_THINK_MODEL,
     listenModel: env.DEEPGRAM_LISTEN_MODEL,
-    speakModel: env.DEEPGRAM_SPEAK_MODEL
+    speakModel: env.DEEPGRAM_SPEAK_MODEL,
+    // 8s per https://developers.deepgram.com/docs/agent-keep-alive
+    keepAliveIntervalMs: env.DEEPGRAM_KEEPALIVE_INTERVAL_MS
   },
 
   keevaris: {
@@ -102,5 +108,10 @@ export const config = {
     ttlMs: env.CALL_REGISTRY_TTL_MS
   },
 
-  maxConcurrentSessions: env.MAX_CONCURRENT_SESSIONS
+  maxConcurrentSessions: env.MAX_CONCURRENT_SESSIONS,
+
+  session: {
+    maxCallMs: env.MAX_CALL_SECONDS * 1000,
+    idleTimeoutMs: env.IDLE_TIMEOUT_SECONDS * 1000
+  }
 } as const

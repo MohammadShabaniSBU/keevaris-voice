@@ -22,7 +22,7 @@ export class FakeTransport implements Transport {
 
   private readonly audioHandlers: Array<(chunk: Buffer) => void> = []
   private readonly closeHandlers: Array<(reason: TransportCloseReason) => void> = []
-  private closed = false
+  private closedReason: TransportCloseReason | undefined
 
   constructor(
     private readonly log: EventLog,
@@ -39,18 +39,11 @@ export class FakeTransport implements Transport {
     this.audioHandlers.push(handler)
   }
 
-  /**
-   * Deliberate infidelity to "good design" in service of fidelity to the
-   * real bug (finding 5). TwilioTransport/WebTransport latch `closed` against
-   * whatever is in `closeHandlers` at that instant and never revisit it — a
-   * handler registered afterward simply never fires. Replaying the stored
-   * reason to a late subscriber would make hangup-during-agent-handshake go
-   * green on today's broken code. When V01-02 makes the real transports
-   * latch-and-replay, update this to match; that fixture should go green as
-   * a side effect, not need a rewrite.
-   */
   onClose(handler: (reason: TransportCloseReason) => void): void {
     this.closeHandlers.push(handler)
+    if (this.closedReason !== undefined) {
+      handler(this.closedReason)
+    }
   }
 
   sendAudio(chunk: Buffer): void {
@@ -67,6 +60,10 @@ export class FakeTransport implements Transport {
   }
 
   async close(reason: TransportCloseReason): Promise<void> {
+    if (this.closedReason !== undefined) {
+      return
+    }
+
     this.log.push({ on: 'transport', kind: 'close', reason })
     this.emitClose(reason)
   }
@@ -82,8 +79,8 @@ export class FakeTransport implements Transport {
   }
 
   private emitClose(reason: TransportCloseReason): void {
-    if (this.closed) return
-    this.closed = true
+    if (this.closedReason !== undefined) return
+    this.closedReason = reason
     for (const handler of this.closeHandlers) {
       handler(reason)
     }

@@ -33,7 +33,7 @@ export class TwilioTransport implements Transport {
   private streamSid = ''
   private readonly audioHandlers: Array<(chunk: Buffer) => void> = []
   private readonly closeHandlers: Array<(reason: TransportCloseReason) => void> = []
-  private closed = false
+  private closedReason: TransportCloseReason | undefined
   private readonly log = logger.child({ component: 'twilio-transport' })
   private readonly readyPromise: Promise<void>
   private resolveReady!: () => void
@@ -75,6 +75,9 @@ export class TwilioTransport implements Transport {
 
   onClose(handler: (reason: TransportCloseReason) => void): void {
     this.closeHandlers.push(handler)
+    if (this.closedReason !== undefined) {
+      handler(this.closedReason)
+    }
   }
 
   sendAudio(chunk: Buffer): void {
@@ -178,8 +181,8 @@ export class TwilioTransport implements Transport {
   }
 
   private emitClose(reason: TransportCloseReason): void {
-    if (this.closed) return
-    this.closed = true
+    if (this.closedReason !== undefined) return
+    this.closedReason = reason
     for (const handler of this.closeHandlers) handler(reason)
   }
 }

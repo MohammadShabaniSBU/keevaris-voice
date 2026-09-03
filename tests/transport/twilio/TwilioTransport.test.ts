@@ -93,6 +93,26 @@ test('CallSid mismatch rejects valid nonce', async () => {
   assert.equal(ws.closeCalls.length, 1)
 })
 
+test('onClose registered after close fires immediately, exactly once', async () => {
+  const ws = new FakeRawSocket()
+  const registry = new InProcessCallRegistry()
+  const transport = new TwilioTransport(ws, buildRequest(), registry)
+
+  ws.emitClose()
+
+  const reasons: Array<string> = []
+  transport.onClose((reason) => {
+    reasons.push(reason)
+  })
+  transport.onClose((reason) => {
+    reasons.push(reason)
+  })
+
+  await transport.close('error')
+
+  assert.deepEqual(reasons, ['caller_hangup', 'caller_hangup'])
+})
+
 test('valid nonce resolves callerNumber from registry', async () => {
   const ws = new FakeRawSocket()
   const registry = new InProcessCallRegistry(() => 1_000)

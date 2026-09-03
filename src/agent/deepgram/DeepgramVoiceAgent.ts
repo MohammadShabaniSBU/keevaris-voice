@@ -41,6 +41,10 @@ interface DeepgramFunctionCall {
 export class DeepgramVoiceAgent implements AgentProvider {
   private ws: DeepgramSocket | undefined
   private readonly handlers: Array<EventHandler> = []
+  private closedEvent: AgentEvent | undefined
+  private closeRequested = false
+  private keepAliveTimer: ReturnType<typeof setInterval> | undefined
+  private audioSentSinceLastTick = false
   private readonly log
 
   constructor(
@@ -54,6 +58,9 @@ export class DeepgramVoiceAgent implements AgentProvider {
 
   onEvent(handler: EventHandler): void {
     this.handlers.push(handler)
+    if (this.closedEvent !== undefined) {
+      handler(this.closedEvent)
+    }
   }
 
   async start(input: AudioFormat, output: AudioFormat): Promise<void> {
@@ -84,8 +91,14 @@ export class DeepgramVoiceAgent implements AgentProvider {
       })
 
       ws.once('open', () => {
+        if (this.closeRequested) {
+          ws.close()
+          return
+        }
+
         this.log.info({}, 'deepgram.connected')
         ws.send(JSON.stringify(buildSettingsMessage(input, output, { companyName: this.companyName })))
+        this.startKeepAlive()
       })
 
       ws.on('message', (data: Buffer, isBinary: boolean) => {
@@ -102,17 +115,23 @@ export class DeepgramVoiceAgent implements AgentProvider {
       })
 
       ws.on('close', (code: number, reasonBuf: Buffer) => {
+        this.stopKeepAlive()
         const reason = reasonBuf.toString('utf8') || `code_${code}`
         this.log.info({ reason }, 'deepgram.closed')
         this.emit({ type: 'closed', reason })
         settleReject(new Error(`Deepgram connection closed before SettingsApplied: ${reason}`))
       })
+
+      if (this.closeRequested) {
+        ws.close()
+      }
     })
   }
 
   sendAudio(chunk: Buffer): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(chunk)
+      this.audioSentSinceLastTick = true
     }
   }
 
@@ -125,6 +144,8 @@ export class DeepgramVoiceAgent implements AgentProvider {
   }
 
   async close(): Promise<void> {
+    this.closeRequested = true
+    this.stopKeepAlive()
     this.ws?.close()
   }
 
@@ -218,7 +239,30 @@ export class DeepgramVoiceAgent implements AgentProvider {
     }
   }
 
+  private startKeepAlive(): void {
+    this.stopKeepAlive()
+    this.keepAliveTimer = setInterval(() => {
+      if (!this.audioSentSinceLastTick) {
+        this.send({ type: 'KeepAlive' })
+      }
+      this.audioSentSinceLastTick = false
+    }, config.deepgram.keepAliveIntervalMs)
+  }
+
+  private stopKeepAlive(): void {
+    if (this.keepAliveTimer === undefined) {
+      return
+    }
+
+    clearInterval(this.keepAliveTimer)
+    this.keepAliveTimer = undefined
+  }
+
   private emit(event: AgentEvent): void {
+    if (event.type === 'closed' && this.closedEvent === undefined) {
+      this.closedEvent = event
+    }
+
     for (const handler of this.handlers) {
       handler(event)
     }

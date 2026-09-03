@@ -29,7 +29,7 @@ export class WebTransport implements Transport {
 
   private readonly audioHandlers: Array<(chunk: Buffer) => void> = []
   private readonly closeHandlers: Array<(reason: TransportCloseReason) => void> = []
-  private closed = false
+  private closedReason: TransportCloseReason | undefined
   private readonly log
 
   constructor(
@@ -60,6 +60,9 @@ export class WebTransport implements Transport {
 
   onClose(handler: (reason: TransportCloseReason) => void): void {
     this.closeHandlers.push(handler)
+    if (this.closedReason !== undefined) {
+      handler(this.closedReason)
+    }
   }
 
   sendAudio(chunk: Buffer): void {
@@ -91,8 +94,8 @@ export class WebTransport implements Transport {
   }
 
   private emitClose(reason: TransportCloseReason): void {
-    if (this.closed) return
-    this.closed = true
+    if (this.closedReason !== undefined) return
+    this.closedReason = reason
     for (const handler of this.closeHandlers) handler(reason)
   }
 }

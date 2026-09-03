@@ -1,0 +1,23 @@
+{
+  "name": "duration-cap-closes-call",
+  "note": "Duration cap (MAX_CALL_SECONDS=1800) fires teardown with duration_cap. Periodic caller audio keeps the idle timer from winning first.",
+  "events": [
+    { "at": 0, "from": "agentSocket", "kind": "open" },
+    { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
+    { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
+    { "at": 100, "from": "caller", "kind": "audio", "bytes": 160 },
+    { "at": 240000, "from": "caller", "kind": "audio", "bytes": 160 },
+    { "at": 480000, "from": "caller", "kind": "audio", "bytes": 160 },
+    { "at": 720000, "from": "caller", "kind": "audio", "bytes": 160 },
+    { "at": 960000, "from": "caller", "kind": "audio", "bytes": 160 },
+    { "at": 1200000, "from": "caller", "kind": "audio", "bytes": 160 },
+    { "at": 1440000, "from": "caller", "kind": "audio", "bytes": 160 },
+    { "at": 1680000, "from": "caller", "kind": "audio", "bytes": 160 },
+    { "at": 1799000, "from": "caller", "kind": "audio", "bytes": 160 },
+    { "at": 1800001, "from": "caller", "kind": "audio", "bytes": 160 }
+  ],
+  "expect": [
+    { "on": "transport", "kind": "close", "reason": "duration_cap" }
+  ],
+  "assertTimersClearAfter": true
+}

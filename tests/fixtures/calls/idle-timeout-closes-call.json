@@ -1,0 +1,14 @@
+{
+  "name": "idle-timeout-closes-call",
+  "note": "No caller or agent audio after SettingsApplied; idle timeout (IDLE_TIMEOUT_SECONDS=300) fires teardown with idle_timeout. KeepAlive is not audio and must not reset the idle clock.",
+  "events": [
+    { "at": 0, "from": "agentSocket", "kind": "open" },
+    { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
+    { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
+    { "at": 300001, "from": "caller", "kind": "audio", "bytes": 160 }
+  ],
+  "expect": [
+    { "on": "transport", "kind": "close", "reason": "idle_timeout" }
+  ],
+  "assertTimersClearAfter": true
+}

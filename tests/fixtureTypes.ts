@@ -10,7 +10,14 @@ const defaultAudio = {
   output: { encoding: 'mulaw' as const, sampleRate: 8000 }
 }
 
-const closeReasonSchema = z.enum(['caller_hangup', 'transferred', 'error', 'server_shutdown'])
+const closeReasonSchema = z.enum([
+  'caller_hangup',
+  'transferred',
+  'error',
+  'server_shutdown',
+  'duration_cap',
+  'idle_timeout'
+])
 
 export const logMatcherSchema = z.object({
   on: z.enum(['transport', 'agentSocket']),
@@ -72,7 +79,8 @@ export const fixtureSchema = z.object({
   events: z.array(z.discriminatedUnion('from', [callerEventSchema, agentSocketEventSchema])),
   expect: z.array(logMatcherSchema),
   forbid: z.array(logMatcherSchema.extend({ before: z.number().int().nonnegative() })).default([]),
-  count: z.array(logMatcherSchema.extend({ exactly: z.number().int().nonnegative() })).default([])
+  count: z.array(logMatcherSchema.extend({ exactly: z.number().int().nonnegative() })).default([]),
+  assertTimersClearAfter: z.boolean().default(false)
 })
 
 export type CallFixture = z.infer<typeof fixtureSchema>

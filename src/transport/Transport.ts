@@ -12,6 +12,8 @@ export type TransportCloseReason =
   | 'transferred'
   | 'error'
   | 'server_shutdown'
+  | 'duration_cap'
+  | 'idle_timeout'
 
 /**
  * One live call/session on one vendor. Twilio phone calls and browser mic

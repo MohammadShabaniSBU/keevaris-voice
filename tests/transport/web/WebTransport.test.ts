@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { ConnectionRejectedError } from '../../../src/errors.js'
-import { createWebTransport } from '../../../src/transport/web/WebTransport.js'
+import { createWebTransport, WebTransport } from '../../../src/transport/web/WebTransport.js'
 import { WebTokenService } from '../../../src/transport/web/WebToken.js'
 import { FakeRawSocket } from '../../support/FakeRawSocket.js'
 
@@ -34,6 +34,22 @@ test('createWebTransport rejects expired token', async () => {
   now = 61_001
 
   await assert.rejects(createWebTransport(ws, buildRequest(minted.token), service), ConnectionRejectedError)
+})
+
+test('onClose registered after close fires immediately, exactly once', async () => {
+  const ws = new FakeRawSocket()
+  const transport = new WebTransport(ws, 'sess_late_close')
+
+  ws.emitClose()
+
+  const reasons: Array<string> = []
+  transport.onClose((reason) => {
+    reasons.push(reason)
+  })
+
+  await transport.close('error')
+
+  assert.deepEqual(reasons, ['caller_hangup'])
 })
 
 test('createWebTransport accepts valid token and uses sessionId from claims', async () => {

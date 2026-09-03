@@ -151,4 +151,15 @@ export async function runFixture(fixture: CallFixture, t: TestContext): Promise<
   await drain()
 
   assertFixtureLog(log.entries, fixture.expect, fixture.forbid, fixture.count)
+
+  if (fixture.assertTimersClearAfter) {
+    const before = log.entries.length
+    t.mock.timers.tick(24 * 60 * 60 * 1000)
+    await drain()
+    if (log.entries.length !== before) {
+      throw new Error(
+        `timers still pending after teardown: log grew from ${before} to ${log.entries.length}`
+      )
+    }
+  }
 }

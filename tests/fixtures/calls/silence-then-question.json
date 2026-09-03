@@ -2,7 +2,7 @@
   "name": "silence-then-question",
   "vendor": "web",
   "callerNumber": null,
-  "note": "V01-02 owns converting the three-minute silence into a real keepalive-interval count assertion. Today there is no keepalive, so ticking three minutes fires no timer — this fixture only asserts that a question after the silence is still answered. Uses the asymmetric web AudioFormat (linear16 16 kHz in / 24 kHz out) that V01-03 will derive its buffer cap from.",
+  "note": "Three minutes of silence must stay connected: KeepAlive is sent on Deepgram's 8s interval (22 ticks from socket open at t=0 through t=180000, last fire at 176000). A question after the silence is still answered. Uses the asymmetric web AudioFormat (linear16 16 kHz in / 24 kHz out) that V01-03 will derive its buffer cap from.",
   "audio": {
     "input": { "encoding": "linear16", "sampleRate": 16000 },
     "output": { "encoding": "linear16", "sampleRate": 24000 }
@@ -39,5 +39,8 @@
   "expect": [
     { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse" },
     { "on": "transport", "kind": "sendAudio" }
+  ],
+  "count": [
+    { "on": "agentSocket", "kind": "send", "messageType": "KeepAlive", "exactly": 22 }
   ]
 }

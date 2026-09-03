@@ -1,9 +1,18 @@
 {
   "name": "hangup-during-agent-handshake",
-  "note": "Finding 5 only (close latched with no subscriber). Finding 6 is a defensive fix for V01-02 and is not demonstrated here. preState closes the transport before VoiceSession exists, matching emitClose against an empty handler list.",
+  "note": "Findings 5 and 6. preState closes the transport before VoiceSession exists; onClose must replay to the late subscriber, closeRequested must close the socket that opens afterwards, and start() must reject. No Settings (or any other) frame may go out.",
   "preState": { "transportClosed": "caller_hangup" },
-  "events": [],
+  "events": [
+    { "at": 0, "from": "agentSocket", "kind": "open" }
+  ],
   "expect": [
     { "on": "agentSocket", "kind": "closed" }
-  ]
+  ],
+  "forbid": [
+    { "on": "agentSocket", "kind": "send", "before": 0 }
+  ],
+  "count": [
+    { "on": "agentSocket", "kind": "send", "exactly": 0 }
+  ],
+  "assertTimersClearAfter": true
 }
