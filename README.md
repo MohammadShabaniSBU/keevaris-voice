@@ -17,6 +17,15 @@ speaks the flat HTTP contract (`{query, turn_id, session_id, caller_number}`),
 never the A2A one — `VoiceBridgeWireFormat::parse()` auto-detects it from the
 absence of a `jsonrpc` key.
 
+## Working on this repo
+
+Read [`AGENTS.md`](AGENTS.md) first. It routes a task to the doc that governs it.
+The rules this repo actually needs live in
+[`docs/conventions-and-invariants.md`](docs/conventions-and-invariants.md).
+Anything crossing the delegation boundary is governed by
+`unit-hq-api/docs/09-conventions-and-invariants.md` — this repo does not
+reinterpret it.
+
 ## Architecture
 
 ```
@@ -59,10 +68,8 @@ pnpm dev
   `PUBLIC_BASE_URL` to the tunnel's `https://` URL, and point a Twilio number's
   "A call comes in" webhook at `{PUBLIC_BASE_URL}/twilio/voice`.
 
-## Out of scope for this first sketch
+## What is not in this repo yet
 
-Panel integration for web voice (the panel's copilot voice still goes through
-the Vocal Bridge/LiveKit token flow in `CopilotVoiceController`), outbound
-calls, call recording, creating a `VoiceSession` row for calls that never
-delegate, serving the prompt/greeting from the API instead of a local copy,
-and any Dockerfile/deploy wiring.
+The first-sketch out-of-scope list is gone — it was stale the moment sprint 01
+landed. What ships next, what is deliberately later, and what is not on the
+roadmap at all live in [`docs/README.md`](docs/README.md).
