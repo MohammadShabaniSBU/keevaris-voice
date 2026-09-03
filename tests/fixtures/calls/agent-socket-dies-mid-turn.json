@@ -1,0 +1,39 @@
+{
+  "name": "agent-socket-dies-mid-turn",
+  "note": "Finding 8, agent-death path. Delegation arms a transfer, then the agent socket dies before AgentAudioDone. Today's case 'closed' handler drops the caller with transport.close('error') and never calls transfer, so expect fails (forbid is not evaluated).",
+  "delegation": {
+    "response": {
+      "text": "I am transferring you now.",
+      "transfer": true,
+      "destination": "main_line"
+    }
+  },
+  "events": [
+    { "at": 0, "from": "agentSocket", "kind": "open" },
+    { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
+    { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
+    {
+      "at": 100,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "FunctionCallRequest",
+        "functions": [
+          {
+            "id": "fc_1",
+            "name": "ask_keevaris",
+            "arguments": "{\"query\":\"I want to talk to a person\"}",
+            "client_side": true
+          }
+        ]
+      }
+    },
+    { "at": 200, "from": "agentSocket", "kind": "close", "code": 1006, "reason": "agent_died" }
+  ],
+  "expect": [
+    { "on": "transport", "kind": "transfer" }
+  ],
+  "forbid": [
+    { "on": "transport", "kind": "close", "reason": "error", "before": 0 }
+  ]
+}

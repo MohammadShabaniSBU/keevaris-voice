@@ -1,0 +1,13 @@
+{
+  "name": "caller-speaks-during-greeting",
+  "note": "Finding 7. Caller audio is pushed while the agent socket is still CONNECTING — before simulateOpen(), not merely before SettingsApplied. expect sendAudio: today sendAudio drops anything arriving before readyState === OPEN.",
+  "events": [
+    { "at": 0, "from": "caller", "kind": "audio", "bytes": 160 },
+    { "at": 10, "from": "agentSocket", "kind": "open" },
+    { "at": 11, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
+    { "at": 12, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } }
+  ],
+  "expect": [
+    { "on": "agentSocket", "kind": "sendAudio" }
+  ]
+}

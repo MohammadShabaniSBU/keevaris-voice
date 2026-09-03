@@ -1,0 +1,91 @@
+import type { AudioFormat, Transport, TransportCloseReason } from '../../src/transport/Transport.js'
+import type { EventLog } from './EventLog.js'
+
+export interface FakeTransportOptions {
+  vendor: string
+  sessionId: string
+  callerNumber: string | null
+  audioInput: AudioFormat
+  audioOutput: AudioFormat
+}
+
+/**
+ * Transport double driven by the fixture runner. Records outbound calls
+ * even after close so an ordering bug is a failed assertion, not a throw.
+ */
+export class FakeTransport implements Transport {
+  readonly vendor: string
+  readonly sessionId: string
+  readonly callerNumber: string | null
+  readonly audioInput: AudioFormat
+  readonly audioOutput: AudioFormat
+
+  private readonly audioHandlers: Array<(chunk: Buffer) => void> = []
+  private readonly closeHandlers: Array<(reason: TransportCloseReason) => void> = []
+  private closed = false
+
+  constructor(
+    private readonly log: EventLog,
+    options: FakeTransportOptions
+  ) {
+    this.vendor = options.vendor
+    this.sessionId = options.sessionId
+    this.callerNumber = options.callerNumber
+    this.audioInput = options.audioInput
+    this.audioOutput = options.audioOutput
+  }
+
+  onAudio(handler: (chunk: Buffer) => void): void {
+    this.audioHandlers.push(handler)
+  }
+
+  /**
+   * Deliberate infidelity to "good design" in service of fidelity to the
+   * real bug (finding 5). TwilioTransport/WebTransport latch `closed` against
+   * whatever is in `closeHandlers` at that instant and never revisit it — a
+   * handler registered afterward simply never fires. Replaying the stored
+   * reason to a late subscriber would make hangup-during-agent-handshake go
+   * green on today's broken code. When V01-02 makes the real transports
+   * latch-and-replay, update this to match; that fixture should go green as
+   * a side effect, not need a rewrite.
+   */
+  onClose(handler: (reason: TransportCloseReason) => void): void {
+    this.closeHandlers.push(handler)
+  }
+
+  sendAudio(chunk: Buffer): void {
+    this.log.push({ on: 'transport', kind: 'sendAudio', bytes: chunk.length })
+  }
+
+  clearAudio(): void {
+    this.log.push({ on: 'transport', kind: 'clearAudio' })
+  }
+
+  async transfer(destinationNumber: string): Promise<void> {
+    this.log.push({ on: 'transport', kind: 'transfer', destinationNumber })
+    await this.close('transferred')
+  }
+
+  async close(reason: TransportCloseReason): Promise<void> {
+    this.log.push({ on: 'transport', kind: 'close', reason })
+    this.emitClose(reason)
+  }
+
+  pushAudio(chunk: Buffer): void {
+    for (const handler of this.audioHandlers) {
+      handler(chunk)
+    }
+  }
+
+  simulateClose(reason: TransportCloseReason): void {
+    this.emitClose(reason)
+  }
+
+  private emitClose(reason: TransportCloseReason): void {
+    if (this.closed) return
+    this.closed = true
+    for (const handler of this.closeHandlers) {
+      handler(reason)
+    }
+  }
+}

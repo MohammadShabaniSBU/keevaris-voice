@@ -7,6 +7,22 @@ import { buildSettingsMessage } from './settings.js'
 
 const DEEPGRAM_AGENT_URL = 'wss://agent.deepgram.com/v1/agent/converse'
 
+export interface DeepgramSocket {
+  readonly readyState: number
+  on(event: 'message', listener: (data: Buffer, isBinary: boolean) => void): void
+  on(event: 'close', listener: (code: number, reason: Buffer) => void): void
+  on(event: 'error', listener: (error: Error) => void): void
+  once(event: 'open', listener: () => void): void
+  off(event: string, listener: (...args: Array<never>) => void): void
+  send(data: string | Buffer): void
+  close(): void
+}
+
+export type DeepgramSocketFactory = (
+  url: string,
+  options: { headers: Record<string, string> }
+) => DeepgramSocket
+
 type EventHandler = (event: AgentEvent) => void
 
 interface DeepgramFunctionCall {
@@ -23,13 +39,15 @@ interface DeepgramFunctionCall {
  * `AgentEvent`s. See https://developers.deepgram.com/docs/voice-agent-message-flow.
  */
 export class DeepgramVoiceAgent implements AgentProvider {
-  private ws: WebSocket | undefined
+  private ws: DeepgramSocket | undefined
   private readonly handlers: Array<EventHandler> = []
   private readonly log
 
   constructor(
     private readonly sessionId: string,
-    private readonly companyName: string
+    private readonly companyName: string,
+    private readonly socketFactory: DeepgramSocketFactory = (url, options) =>
+      new WebSocket(url, options)
   ) {
     this.log = logger.child({ component: 'deepgram', sessionId })
   }
@@ -39,7 +57,7 @@ export class DeepgramVoiceAgent implements AgentProvider {
   }
 
   async start(input: AudioFormat, output: AudioFormat): Promise<void> {
-    const ws = new WebSocket(DEEPGRAM_AGENT_URL, {
+    const ws = this.socketFactory(DEEPGRAM_AGENT_URL, {
       headers: { Authorization: `Token ${config.deepgram.apiKey}` }
     })
     this.ws = ws

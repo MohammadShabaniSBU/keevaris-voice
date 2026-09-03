@@ -1,6 +1,6 @@
 import { config } from '../config.js'
 import { logger } from '../logger.js'
-import type { DelegationRequest, DelegationResponse } from './types.js'
+import type { DelegationClient, DelegationRequest, DelegationResponse } from './types.js'
 
 /**
  * Mirrors `agents.voice.handoff_sentence` in unit-hq-api's config/agents.php.
@@ -20,7 +20,7 @@ function bridgeUrl(): string {
  * service owns session_id/caller_number reliably, so there is no reason to
  * use the A2A envelope that exists only to work around Vocal Bridge.
  */
-export class KeevarisClient {
+export class KeevarisClient implements DelegationClient {
   async ask(request: DelegationRequest): Promise<DelegationResponse> {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), config.keevaris.timeoutMs)

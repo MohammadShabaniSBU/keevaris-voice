@@ -1,0 +1,43 @@
+{
+  "name": "silence-then-question",
+  "vendor": "web",
+  "callerNumber": null,
+  "note": "V01-02 owns converting the three-minute silence into a real keepalive-interval count assertion. Today there is no keepalive, so ticking three minutes fires no timer — this fixture only asserts that a question after the silence is still answered. Uses the asymmetric web AudioFormat (linear16 16 kHz in / 24 kHz out) that V01-03 will derive its buffer cap from.",
+  "audio": {
+    "input": { "encoding": "linear16", "sampleRate": 16000 },
+    "output": { "encoding": "linear16", "sampleRate": 24000 }
+  },
+  "delegation": {
+    "response": {
+      "text": "A 10 by 10 is 89 a month.",
+      "transfer": false
+    }
+  },
+  "events": [
+    { "at": 0, "from": "agentSocket", "kind": "open" },
+    { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
+    { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
+    {
+      "at": 180000,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "FunctionCallRequest",
+        "functions": [
+          {
+            "id": "fc_1",
+            "name": "ask_keevaris",
+            "arguments": "{\"query\":\"how much is a 10 by 10?\"}",
+            "client_side": true
+          }
+        ]
+      }
+    },
+    { "at": 180100, "from": "agentSocket", "kind": "audio", "bytes": 480 },
+    { "at": 180200, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } }
+  ],
+  "expect": [
+    { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse" },
+    { "on": "transport", "kind": "sendAudio" }
+  ]
+}

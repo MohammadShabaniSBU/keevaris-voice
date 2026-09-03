@@ -1,0 +1,103 @@
+import assert from 'node:assert/strict'
+import { afterEach, test } from 'node:test'
+import { z } from 'zod'
+import { KeevarisClient } from '../src/delegation/KeevarisClient.js'
+import { config } from '../src/config.js'
+
+const FALLBACK = {
+  text: 'Let me put you through to someone who can help.',
+  transfer: true,
+  destination: 'main_line'
+} as const
+
+const requestSchema = z.object({
+  query: z.string(),
+  turn_id: z.string(),
+  session_id: z.string(),
+  caller_number: z.string().nullable()
+})
+
+const request = {
+  query: 'what are your hours?',
+  turn_id: 'fc_1',
+  session_id: 'sess_contract',
+  caller_number: '+15555550100'
+}
+
+const originalFetch = globalThis.fetch
+
+afterEach(() => {
+  globalThis.fetch = originalFetch
+})
+
+function mockFetch(impl: typeof fetch): void {
+  globalThis.fetch = impl
+}
+
+function drain(): Promise<void> {
+  return new Promise((resolve) => {
+    setImmediate(resolve)
+  })
+}
+
+test('well-formed backend response is returned as-is', async () => {
+  mockFetch(async (url, init) => {
+    assert.equal(String(url), `${config.keevaris.apiUrl}/api/voice/bridge/${config.keevaris.bridgeToken}`)
+    assert.equal(init?.method, 'POST')
+    const headers = new Headers(init?.headers)
+    assert.equal(headers.get('Content-Type'), 'application/json')
+    assert.equal(headers.get('Accept'), 'application/json')
+    assert.equal(headers.get('X-Voice-Bridge-Secret'), config.keevaris.bridgeSecret)
+    const body = requestSchema.parse(JSON.parse(String(init?.body)))
+    assert.deepEqual(body, request)
+
+    return new Response(JSON.stringify({ text: 'We close at 6.', transfer: false }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  })
+
+  const result = await new KeevarisClient().ask(request)
+  assert.deepEqual(result, { text: 'We close at 6.', transfer: false, destination: undefined })
+})
+
+test('response missing text falls back', async () => {
+  mockFetch(async () => {
+    return new Response(JSON.stringify({ transfer: true, destination: 'main_line' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  })
+
+  const result = await new KeevarisClient().ask(request)
+  assert.deepEqual(result, { ...FALLBACK })
+})
+
+test('non-2xx status falls back', async () => {
+  mockFetch(async () => {
+    return new Response('nope', { status: 503 })
+  })
+
+  const result = await new KeevarisClient().ask(request)
+  assert.deepEqual(result, { ...FALLBACK })
+})
+
+test('AbortController timeout falls back', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'] })
+
+  mockFetch(async (_url, init) => {
+    return new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => {
+        const error = new Error('The operation was aborted')
+        error.name = 'AbortError'
+        reject(error)
+      })
+    })
+  })
+
+  const pending = new KeevarisClient().ask(request)
+  t.mock.timers.tick(config.keevaris.timeoutMs)
+  await drain()
+  const result = await pending
+  assert.deepEqual(result, { ...FALLBACK })
+})

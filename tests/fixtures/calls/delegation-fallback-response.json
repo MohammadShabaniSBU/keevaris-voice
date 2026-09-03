@@ -1,0 +1,43 @@
+{
+  "name": "delegation-fallback-response",
+  "note": "Filler AgentAudioDone is scripted BEFORE the delayed ask() resolves. That order is load-bearing: this fixture tests that the system behaves correctly while a slow answer is still pending, not finding 8 again with different timing. Reversing the two events reproduces transfer-after-filler and would silently add a sixth red fixture. Real AbortController timeout coverage lives in delegationContract.test.ts.",
+  "delegation": {
+    "delayMs": 1000,
+    "response": {
+      "text": "Let me put you through to someone who can help.",
+      "transfer": true,
+      "destination": "main_line"
+    }
+  },
+  "events": [
+    { "at": 0, "from": "agentSocket", "kind": "open" },
+    { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
+    { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
+    {
+      "at": 100,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "FunctionCallRequest",
+        "functions": [
+          {
+            "id": "fc_1",
+            "name": "ask_keevaris",
+            "arguments": "{\"query\":\"I need a person\"}",
+            "client_side": true
+          }
+        ]
+      }
+    },
+    { "at": 200, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } },
+    { "at": 1500, "from": "agentSocket", "kind": "audio", "bytes": 320 },
+    { "at": 1600, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } }
+  ],
+  "expect": [
+    { "on": "transport", "kind": "sendAudio" },
+    { "on": "transport", "kind": "transfer" }
+  ],
+  "forbid": [
+    { "on": "transport", "kind": "transfer", "before": 0 }
+  ]
+}

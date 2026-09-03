@@ -1,0 +1,43 @@
+{
+  "name": "two-function-calls-one-request",
+  "note": "Finding 9. One FunctionCallRequest with two entries must produce exactly one InjectAgentMessage. Today's handleFunctionCallRequest emits one event per function, so the filler is spoken twice.",
+  "delegation": {
+    "response": {
+      "text": "We have 10 by 10 units available.",
+      "transfer": false
+    }
+  },
+  "events": [
+    { "at": 0, "from": "agentSocket", "kind": "open" },
+    { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
+    { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
+    {
+      "at": 100,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "FunctionCallRequest",
+        "functions": [
+          {
+            "id": "fc_1",
+            "name": "ask_keevaris",
+            "arguments": "{\"query\":\"do you have 10 by 10 units?\"}",
+            "client_side": true
+          },
+          {
+            "id": "fc_2",
+            "name": "ask_keevaris",
+            "arguments": "{\"query\":\"how much is a 10 by 10?\"}",
+            "client_side": true
+          }
+        ]
+      }
+    }
+  ],
+  "expect": [
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage" }
+  ],
+  "count": [
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "exactly": 1 }
+  ]
+}

@@ -18,3 +18,7 @@ export interface DelegationResponse {
   transfer: boolean
   destination?: string
 }
+
+export interface DelegationClient {
+  ask(request: DelegationRequest): Promise<DelegationResponse>
+}
