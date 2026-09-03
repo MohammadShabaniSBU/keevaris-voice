@@ -222,13 +222,20 @@ export class DeepgramVoiceAgent implements AgentProvider {
 
   private handleFunctionCallRequest(message: Record<string, unknown>): void {
     const functions = Array.isArray(message.functions) ? (message.functions as Array<unknown>) : []
+    const calls: Array<{ id: string; name: string; arguments: string }> = []
 
     for (const entry of functions) {
       const call = this.parseFunctionCall(entry)
       if (call === null) continue
 
-      this.emit({ type: 'functionCall', id: call.id, name: call.name, arguments: call.arguments })
+      calls.push({ id: call.id, name: call.name, arguments: call.arguments })
     }
+
+    if (calls.length === 0) {
+      return
+    }
+
+    this.emit({ type: 'functionCalls', calls })
   }
 
   private parseFunctionCall(entry: unknown): DeepgramFunctionCall | null {

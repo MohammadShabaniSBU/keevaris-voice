@@ -20,9 +20,10 @@ const closeReasonSchema = z.enum([
 ])
 
 export const logMatcherSchema = z.object({
-  on: z.enum(['transport', 'agentSocket']),
+  on: z.enum(['transport', 'agentSocket', 'session']),
   kind: z.string(),
   messageType: z.string().optional(),
+  functionCallId: z.string().optional(),
   bytes: z.number().optional(),
   reason: z.string().optional(),
   destinationNumber: z.string().optional()
@@ -46,6 +47,18 @@ const agentSocketEventSchema = z.object({
   reason: z.string().optional()
 })
 
+const clockEventSchema = z.object({
+  at: z.number().nonnegative(),
+  from: z.literal('clock'),
+  kind: z.literal('advance')
+})
+
+const delegationResponseSchema = z.object({
+  text: z.string(),
+  transfer: z.boolean(),
+  destination: z.string().optional()
+})
+
 export const fixtureSchema = z.object({
   name: z.string(),
   vendor: z.enum(['twilio', 'web']).default('twilio'),
@@ -60,13 +73,8 @@ export const fixtureSchema = z.object({
   delegation: z
     .object({
       delayMs: z.number().nonnegative().optional(),
-      response: z
-        .object({
-          text: z.string(),
-          transfer: z.boolean(),
-          destination: z.string().optional()
-        })
-        .optional(),
+      response: delegationResponseSchema.optional(),
+      responses: z.array(delegationResponseSchema).optional(),
       reject: z.boolean().optional()
     })
     .default({}),
@@ -76,7 +84,9 @@ export const fixtureSchema = z.object({
       transportClosed: closeReasonSchema.optional()
     })
     .optional(),
-  events: z.array(z.discriminatedUnion('from', [callerEventSchema, agentSocketEventSchema])),
+  events: z.array(
+    z.discriminatedUnion('from', [callerEventSchema, agentSocketEventSchema, clockEventSchema])
+  ),
   expect: z.array(logMatcherSchema),
   forbid: z.array(logMatcherSchema.extend({ before: z.number().int().nonnegative() })).default([]),
   count: z.array(logMatcherSchema.extend({ exactly: z.number().int().nonnegative() })).default([]),

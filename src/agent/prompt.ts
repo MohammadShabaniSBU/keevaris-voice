@@ -12,6 +12,13 @@
 
 export const GREETING_EN = 'I am an automated assistant for {company}.'
 
+/**
+ * Latency filler spoken via `InjectAgentMessage` while a delegation is in
+ * flight. Same accessor family as `buildGreeting` so V03-03 replaces one
+ * source rather than hunting string literals. Not localised here.
+ */
+export const FILLER_EN = 'Let me check that for you.'
+
 export const ASK_KEEVARIS_FUNCTION_NAME = 'ask_keevaris'
 
 /**
@@ -42,6 +49,10 @@ export const ASK_KEEVARIS_DESCRIPTION =
  */
 export function buildGreeting(companyName: string): string {
   return GREETING_EN.replace('{company}', companyName)
+}
+
+export function buildFiller(): string {
+  return FILLER_EN
 }
 
 export function buildSystemPrompt(): string {

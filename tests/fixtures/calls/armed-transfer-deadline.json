@@ -1,6 +1,6 @@
 {
-  "name": "agent-socket-dies-mid-turn",
-  "note": "Finding 8, agent-death path. Delegation arms a transfer, then the agent socket dies before AgentAudioDone. Transport is still live (transportGone stays false), so teardown dispatches the transfer instead of dropping the caller.",
+  "name": "armed-transfer-deadline",
+  "note": "Armed transfer, no closing AgentAudioDone. Clock advance past TRANSFER_ARM_DEADLINE_MS (45s from arm at t=100) fires the transfer. Timers must not outlive teardown.",
   "delegation": {
     "response": {
       "text": "I am transferring you now.",
@@ -28,12 +28,11 @@
         ]
       }
     },
-    { "at": 200, "from": "agentSocket", "kind": "close", "code": 1006, "reason": "agent_died" }
+    { "at": 45100, "from": "clock", "kind": "advance" }
   ],
   "expect": [
+    { "on": "session", "kind": "session.transfer_deadline" },
     { "on": "transport", "kind": "transfer" }
   ],
-  "forbid": [
-    { "on": "transport", "kind": "close", "reason": "error", "before": 0 }
-  ]
+  "assertTimersClearAfter": true
 }

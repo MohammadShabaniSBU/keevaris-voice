@@ -39,16 +39,25 @@ export class DeepgramSocketDouble implements DeepgramSocket {
     }
 
     let messageType = 'unknown'
+    let functionCallId: string | undefined
     try {
-      const parsed = JSON.parse(data) as { type?: unknown }
+      const parsed = JSON.parse(data) as { type?: unknown; id?: unknown }
       if (typeof parsed.type === 'string') {
         messageType = parsed.type
+      }
+      if (typeof parsed.id === 'string') {
+        functionCallId = parsed.id
       }
     } catch {
       messageType = 'unparseable'
     }
 
-    this.log.push({ on: 'agentSocket', kind: 'send', messageType })
+    this.log.push({
+      on: 'agentSocket',
+      kind: 'send',
+      messageType,
+      ...(functionCallId !== undefined ? { functionCallId } : {})
+    })
   }
 
   close(): void {

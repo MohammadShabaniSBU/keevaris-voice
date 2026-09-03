@@ -1,6 +1,6 @@
 {
-  "name": "agent-socket-dies-mid-turn",
-  "note": "Finding 8, agent-death path. Delegation arms a transfer, then the agent socket dies before AgentAudioDone. Transport is still live (transportGone stays false), so teardown dispatches the transfer instead of dropping the caller.",
+  "name": "transfer-abandoned-on-caller-hangup",
+  "note": "Transfer armed, then the transport closes (caller hangup) before the answer AgentAudioDone. transport.onClose sets transportGone, so teardown skips dispatch. No transport.transfer; session.transfer_abandoned, not session.transfer_teardown.",
   "delegation": {
     "response": {
       "text": "I am transferring you now.",
@@ -28,12 +28,13 @@
         ]
       }
     },
-    { "at": 200, "from": "agentSocket", "kind": "close", "code": 1006, "reason": "agent_died" }
+    { "at": 150, "from": "caller", "kind": "close", "reason": "caller_hangup" }
   ],
   "expect": [
-    { "on": "transport", "kind": "transfer" }
+    { "on": "session", "kind": "session.transfer_abandoned" }
   ],
-  "forbid": [
-    { "on": "transport", "kind": "close", "reason": "error", "before": 0 }
+  "count": [
+    { "on": "transport", "kind": "transfer", "exactly": 0 },
+    { "on": "session", "kind": "session.transfer_teardown", "exactly": 0 }
   ]
 }

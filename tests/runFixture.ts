@@ -1,7 +1,7 @@
 import type { TestContext } from 'node:test'
 import { DeepgramVoiceAgent } from '../src/agent/deepgram/DeepgramVoiceAgent.js'
 import { config } from '../src/config.js'
-import { VoiceSession } from '../src/session/VoiceSession.js'
+import { attachSessionLogSink, VoiceSession } from '../src/session/VoiceSession.js'
 import type { EventLogEntry } from './support/EventLog.js'
 import { EventLog } from './support/EventLog.js'
 import { DeepgramSocketDouble } from './support/DeepgramSocketDouble.js'
@@ -73,6 +73,10 @@ export async function runFixture(fixture: CallFixture, t: TestContext): Promise<
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'] })
 
   const log = new EventLog()
+  attachSessionLogSink((entry) => {
+    log.push({ on: 'session', kind: entry.kind })
+  })
+
   const transport = new FakeTransport(log, {
     vendor: fixture.vendor,
     sessionId: fixture.sessionId,
@@ -102,64 +106,74 @@ export async function runFixture(fixture: CallFixture, t: TestContext): Promise<
 
   const sessionStartPromise = session.start()
   sessionStartPromise.catch(() => {})
-  await drain()
 
-  const events = [...fixture.events].sort((a, b) => a.at - b.at)
-  let now = 0
-  for (const event of events) {
-    const gap = event.at - now
-    if (gap > 0) {
-      t.mock.timers.tick(gap)
-    }
-    now = event.at
+  try {
     await drain()
 
-    if (event.from === 'caller') {
-      if (event.kind === 'audio') {
-        transport.pushAudio(Buffer.alloc(event.bytes ?? 160))
+    const events = [...fixture.events].sort((a, b) => a.at - b.at)
+    let now = 0
+    for (const event of events) {
+      const gap = event.at - now
+      if (gap > 0) {
+        t.mock.timers.tick(gap)
+      }
+      now = event.at
+      await drain()
+
+      if (event.from === 'clock') {
+        await drain()
+        continue
+      }
+
+      if (event.from === 'caller') {
+        if (event.kind === 'audio') {
+          transport.pushAudio(Buffer.alloc(event.bytes ?? 160))
+        } else {
+          transport.simulateClose(event.reason ?? 'caller_hangup')
+        }
       } else {
-        transport.simulateClose(event.reason ?? 'caller_hangup')
+        if (socket === undefined) {
+          throw new Error(`agent socket not created before event at ${event.at}`)
+        }
+        switch (event.kind) {
+          case 'open':
+            socket.simulateOpen()
+            break
+          case 'control':
+            socket.sendControl(event.message ?? {})
+            break
+          case 'audio':
+            socket.sendAudioFrame(Buffer.alloc(event.bytes ?? 320))
+            break
+          case 'close':
+            socket.simulateClose(event.code, event.reason)
+            break
+          case 'error':
+            socket.simulateError(new Error(event.reason ?? 'socket error'))
+            break
+          default:
+            break
+        }
       }
-    } else {
-      if (socket === undefined) {
-        throw new Error(`agent socket not created before event at ${event.at}`)
-      }
-      switch (event.kind) {
-        case 'open':
-          socket.simulateOpen()
-          break
-        case 'control':
-          socket.sendControl(event.message ?? {})
-          break
-        case 'audio':
-          socket.sendAudioFrame(Buffer.alloc(event.bytes ?? 320))
-          break
-        case 'close':
-          socket.simulateClose(event.code, event.reason)
-          break
-        case 'error':
-          socket.simulateError(new Error(event.reason ?? 'socket error'))
-          break
-        default:
-          break
-      }
+
+      await drain()
     }
 
     await drain()
-  }
 
-  await drain()
+    assertFixtureLog(log.entries, fixture.expect, fixture.forbid, fixture.count)
 
-  assertFixtureLog(log.entries, fixture.expect, fixture.forbid, fixture.count)
-
-  if (fixture.assertTimersClearAfter) {
-    const before = log.entries.length
-    t.mock.timers.tick(24 * 60 * 60 * 1000)
-    await drain()
-    if (log.entries.length !== before) {
-      throw new Error(
-        `timers still pending after teardown: log grew from ${before} to ${log.entries.length}`
-      )
+    if (fixture.assertTimersClearAfter) {
+      const before = log.entries.length
+      t.mock.timers.tick(24 * 60 * 60 * 1000)
+      await drain()
+      if (log.entries.length !== before) {
+        throw new Error(
+          `timers still pending after teardown: log grew from ${before} to ${log.entries.length}`
+        )
+      }
     }
+  } finally {
+    attachSessionLogSink(undefined)
   }
 }

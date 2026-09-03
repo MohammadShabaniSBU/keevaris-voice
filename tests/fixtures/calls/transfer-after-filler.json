@@ -1,6 +1,6 @@
 {
   "name": "transfer-after-filler",
-  "note": "Finding 8, delegation path. Filler AgentAudioDone arrives after the whole function-call handler has completed. Anchor on answer audio, not FunctionCallResponse. Today's code transfers on the filler done event, so expect [sendAudio, transfer] fails (forbid is a second line of defence and is not evaluated).",
+  "note": "Finding 8, delegation path. Fast delegation arms a transfer while the filler is still the in-flight turn. Transfer waits for the answer's AgentAudioDone, so sendAudio (the handoff sentence) precedes transport.transfer.",
   "delegation": {
     "response": {
       "text": "I am transferring you to the front desk.",

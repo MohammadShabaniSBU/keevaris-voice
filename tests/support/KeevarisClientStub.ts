@@ -7,6 +7,7 @@ import type {
 export interface KeevarisClientStubConfig {
   delayMs?: number
   response?: DelegationResponse
+  responses?: Array<DelegationResponse>
   reject?: boolean
 }
 
@@ -20,6 +21,8 @@ const DEFAULT_RESPONSE: DelegationResponse = {
  * cannot pick up the retry / hours-aware fallback V02-03 will add there.
  */
 export class KeevarisClientStub implements DelegationClient {
+  private nextResponseIndex = 0
+
   constructor(private readonly config: KeevarisClientStubConfig = {}) {}
 
   ask(_request: DelegationRequest): Promise<DelegationResponse> {
@@ -27,7 +30,7 @@ export class KeevarisClientStub implements DelegationClient {
       return Promise.reject(new Error('delegation stub rejected'))
     }
 
-    const response = this.config.response ?? DEFAULT_RESPONSE
+    const response = this.nextResponse()
     const delayMs = this.config.delayMs ?? 0
     if (delayMs <= 0) {
       return Promise.resolve(response)
@@ -36,5 +39,16 @@ export class KeevarisClientStub implements DelegationClient {
     return new Promise((resolve) => {
       setTimeout(() => resolve(response), delayMs)
     })
+  }
+
+  private nextResponse(): DelegationResponse {
+    const sequenced = this.config.responses
+    if (sequenced !== undefined && sequenced.length > 0) {
+      const index = Math.min(this.nextResponseIndex, sequenced.length - 1)
+      this.nextResponseIndex += 1
+      return sequenced[index] as DelegationResponse
+    }
+
+    return this.config.response ?? DEFAULT_RESPONSE
   }
 }

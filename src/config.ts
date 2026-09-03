@@ -44,7 +44,11 @@ const envSchema = z.object({
   CALL_REGISTRY_TTL_MS: z.coerce.number().int().positive().default(60_000),
   MAX_CONCURRENT_SESSIONS: z.coerce.number().int().positive().default(20),
   MAX_CALL_SECONDS: z.coerce.number().int().positive().default(1800),
-  IDLE_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(300)
+  IDLE_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(300),
+  // ChannelProfile::Voice is 600 chars / 2 sentences. Neural TTS at ~150 wpm
+  // is ~40s for that ceiling; 45s leaves a small margin so the arm deadline
+  // cannot cut the handoff sentence we are waiting to finish.
+  TRANSFER_ARM_DEADLINE_MS: z.coerce.number().int().positive().default(45_000)
 })
 
 export type Env = z.infer<typeof envSchema>
@@ -112,6 +116,10 @@ export const config = {
 
   session: {
     maxCallMs: env.MAX_CALL_SECONDS * 1000,
-    idleTimeoutMs: env.IDLE_TIMEOUT_SECONDS * 1000
+    idleTimeoutMs: env.IDLE_TIMEOUT_SECONDS * 1000,
+    // ChannelProfile::Voice is 600 chars / 2 sentences. Neural TTS at ~150 wpm
+    // is ~40s for that ceiling; 45s leaves a small margin so the arm deadline
+    // cannot cut the handoff sentence we are waiting to finish.
+    transferArmDeadlineMs: env.TRANSFER_ARM_DEADLINE_MS
   }
 } as const

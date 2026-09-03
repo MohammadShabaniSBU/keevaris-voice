@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import type { AgentEvent } from '../../../src/agent/AgentProvider.js'
 import { DeepgramVoiceAgent } from '../../../src/agent/deepgram/DeepgramVoiceAgent.js'
 import { EventLog } from '../../support/EventLog.js'
 import { DeepgramSocketDouble } from '../../support/DeepgramSocketDouble.js'
@@ -194,4 +195,49 @@ test('onEvent registered after closed fires immediately, exactly once', async ()
   })
 
   assert.deepEqual(reasons, ['gone', 'gone'])
+})
+
+test('one FunctionCallRequest with two entries emits one functionCalls event', async () => {
+  const log = new EventLog()
+  let socket: DeepgramSocketDouble | undefined
+
+  const agent = new DeepgramVoiceAgent('sess_two_calls', 'Keevaris', () => {
+    socket = new DeepgramSocketDouble(log)
+    return socket
+  })
+
+  const startPromise = agent.start(AUDIO, AUDIO)
+  startPromise.catch(() => {})
+  await drain()
+
+  assert.ok(socket)
+  socket.simulateOpen()
+  socket.sendControl({ type: 'SettingsApplied' })
+  await drain()
+  await startPromise
+
+  const received: Array<AgentEvent> = []
+  agent.onEvent((event) => {
+    received.push(event)
+  })
+
+  socket.sendControl({
+    type: 'FunctionCallRequest',
+    functions: [
+      { id: 'fc_1', name: 'ask_keevaris', arguments: '{"query":"a"}', client_side: true },
+      { id: 'fc_2', name: 'ask_keevaris', arguments: '{"query":"b"}', client_side: true }
+    ]
+  })
+  await drain()
+
+  const functionCalls = received.filter((event) => event.type === 'functionCalls')
+  assert.equal(functionCalls.length, 1)
+  assert.deepEqual(functionCalls[0], {
+    type: 'functionCalls',
+    calls: [
+      { id: 'fc_1', name: 'ask_keevaris', arguments: '{"query":"a"}' },
+      { id: 'fc_2', name: 'ask_keevaris', arguments: '{"query":"b"}' }
+    ]
+  })
+  await agent.close()
 })

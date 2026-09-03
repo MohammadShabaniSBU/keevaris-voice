@@ -1,6 +1,6 @@
 {
-  "name": "agent-socket-dies-mid-turn",
-  "note": "Finding 8, agent-death path. Delegation arms a transfer, then the agent socket dies before AgentAudioDone. Transport is still live (transportGone stays false), so teardown dispatches the transfer instead of dropping the caller.",
+  "name": "transfer-completes-on-agent-error-teardown",
+  "note": "Regression for the transportGone flag. Same arm as the hangup fixture, but the close comes from the agent socket. transportGone stays false; teardown dispatches.",
   "delegation": {
     "response": {
       "text": "I am transferring you now.",
@@ -28,12 +28,13 @@
         ]
       }
     },
-    { "at": 200, "from": "agentSocket", "kind": "close", "code": 1006, "reason": "agent_died" }
+    { "at": 150, "from": "agentSocket", "kind": "error", "reason": "agent_error" }
   ],
   "expect": [
+    { "on": "session", "kind": "session.transfer_teardown" },
     { "on": "transport", "kind": "transfer" }
   ],
-  "forbid": [
-    { "on": "transport", "kind": "close", "reason": "error", "before": 0 }
+  "count": [
+    { "on": "session", "kind": "session.transfer_abandoned", "exactly": 0 }
   ]
 }

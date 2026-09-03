@@ -4,7 +4,7 @@ export type AgentEvent =
   | { type: 'audio'; chunk: Buffer }
   | { type: 'userStartedSpeaking' }
   | { type: 'transcript'; role: 'user' | 'agent'; text: string }
-  | { type: 'functionCall'; id: string; name: string; arguments: string }
+  | { type: 'functionCalls'; calls: Array<{ id: string; name: string; arguments: string }> }
   | { type: 'agentAudioDone' }
   | { type: 'closed'; reason: string }
   | { type: 'error'; message: string }
@@ -12,8 +12,8 @@ export type AgentEvent =
 /**
  * The fast conversational vendor (Deepgram today). Owns STT, the small/fast
  * LLM, TTS, and barge-in detection; the only thing it is not allowed to do
- * on its own is state a fact — that always goes through a `functionCall`
- * that `VoiceSession` resolves via `KeevarisClient`.
+ * on its own is state a fact — that always goes through a `functionCalls`
+ * event that `VoiceSession` resolves via `KeevarisClient`.
  *
  * Swapping vendors means implementing this interface; nothing in
  * `VoiceSession` or the transports needs to change.
