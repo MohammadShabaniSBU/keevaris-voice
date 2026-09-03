@@ -31,7 +31,16 @@ const envSchema = z.object({
 
   // Placeholder until the greeting is served from unit-hq-api and can carry
   // the operator's real registered name per VoiceBridgeCustomerConfig.
-  COMPANY_NAME: z.string().default('Keevaris')
+  COMPANY_NAME: z.string().default('Keevaris'),
+
+  ALLOW_DEV_PAGE: z
+    .string()
+    .default('false')
+    .transform((value) => value === 'true'),
+  WEB_TOKEN_SECRET: z.string().min(1, 'WEB_TOKEN_SECRET is required'),
+  WEB_TOKEN_TTL_MS: z.coerce.number().int().positive().default(300_000),
+  CALL_REGISTRY_TTL_MS: z.coerce.number().int().positive().default(60_000),
+  MAX_CONCURRENT_SESSIONS: z.coerce.number().int().positive().default(20)
 })
 
 export type Env = z.infer<typeof envSchema>
@@ -80,5 +89,18 @@ export const config = {
     voicemailNumber: env.TRANSFER_VOICEMAIL_NUMBER
   },
 
-  companyName: env.COMPANY_NAME
+  companyName: env.COMPANY_NAME,
+
+  allowDevPage: env.ALLOW_DEV_PAGE,
+
+  webToken: {
+    secret: env.WEB_TOKEN_SECRET,
+    ttlMs: env.WEB_TOKEN_TTL_MS
+  },
+
+  callRegistry: {
+    ttlMs: env.CALL_REGISTRY_TTL_MS
+  },
+
+  maxConcurrentSessions: env.MAX_CONCURRENT_SESSIONS
 } as const

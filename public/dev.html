@@ -84,7 +84,12 @@
       startButton.disabled = true
       setStatus('connecting')
 
-      const wsUrl = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/web/media`
+      const tokenResponse = await fetch('/dev/token')
+      if (!tokenResponse.ok) {
+        throw new Error(`token request failed: ${tokenResponse.status}`)
+      }
+      const { token } = await tokenResponse.json()
+      const wsUrl = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/web/media?token=${encodeURIComponent(token)}`
       ws = new WebSocket(wsUrl)
       ws.binaryType = 'arraybuffer'
 

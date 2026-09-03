@@ -1,9 +1,11 @@
 import type { IncomingMessage } from 'node:http'
 import twilioSdk from 'twilio'
-import { WebSocket } from 'ws'
 import { config } from '../../config.js'
+import { ConnectionRejectedError } from '../../errors.js'
 import { logger } from '../../logger.js'
+import type { RawSocket } from '../RawSocket.js'
 import type { AudioFormat, Transport, TransportCloseReason } from '../Transport.js'
+import type { CallRegistry } from './CallRegistry.js'
 import { buildDialTwiml } from './twiml.js'
 
 const AUDIO_FORMAT: AudioFormat = { encoding: 'mulaw', sampleRate: 8000 }
@@ -17,10 +19,9 @@ interface TwilioStartPayload {
 /**
  * One Twilio call's bidirectional Media Stream
  * (`<Connect><Stream url="wss://.../twilio/media">`). `callSid` is Twilio's
- * own stable call id — that becomes `sessionId` — and `From` rides in as a
- * custom TwiML parameter set from the original `/twilio/voice` webhook body,
- * so both survive for the life of the call with no vendor cooperation
- * required.
+ * own stable call id — that becomes `sessionId` — and the caller number is
+ * resolved from the single-use nonce minted at the signature-validated
+ * `/twilio/voice` webhook, never from client-supplied frame fields.
  */
 export class TwilioTransport implements Transport {
   readonly vendor = 'twilio'
@@ -35,10 +36,18 @@ export class TwilioTransport implements Transport {
   private closed = false
   private readonly log = logger.child({ component: 'twilio-transport' })
   private readonly readyPromise: Promise<void>
+  private resolveReady!: () => void
+  private rejectReady!: (error: Error) => void
 
-  constructor(private readonly ws: WebSocket, _request: IncomingMessage) {
-    this.readyPromise = new Promise<void>((resolve) => {
-      ws.on('message', (data: Buffer) => this.handleMessage(data, resolve))
+  constructor(
+    private readonly ws: RawSocket,
+    private readonly request: IncomingMessage,
+    private readonly callRegistry: CallRegistry
+  ) {
+    this.readyPromise = new Promise<void>((resolve, reject) => {
+      this.resolveReady = resolve
+      this.rejectReady = reject
+      ws.on('message', (data: Buffer) => this.handleMessage(data))
       ws.on('close', () => this.emitClose('caller_hangup'))
       ws.on('error', (error: Error) => {
         this.log.error({ error: error.message }, 'twilio.ws_error')
@@ -69,7 +78,7 @@ export class TwilioTransport implements Transport {
   }
 
   sendAudio(chunk: Buffer): void {
-    if (this.ws.readyState !== WebSocket.OPEN || this.streamSid === '') return
+    if (this.ws.readyState !== 1 || this.streamSid === '') return
 
     this.ws.send(
       JSON.stringify({
@@ -81,7 +90,7 @@ export class TwilioTransport implements Transport {
   }
 
   clearAudio(): void {
-    if (this.ws.readyState !== WebSocket.OPEN || this.streamSid === '') return
+    if (this.ws.readyState !== 1 || this.streamSid === '') return
 
     this.ws.send(JSON.stringify({ event: 'clear', streamSid: this.streamSid }))
   }
@@ -110,12 +119,12 @@ export class TwilioTransport implements Transport {
 
   async close(reason: TransportCloseReason): Promise<void> {
     this.emitClose(reason)
-    if (this.ws.readyState === WebSocket.OPEN) {
+    if (this.ws.readyState === 1) {
       this.ws.close()
     }
   }
 
-  private handleMessage(data: Buffer, resolveReady: () => void): void {
+  private handleMessage(data: Buffer): void {
     let message: Record<string, unknown>
     try {
       message = JSON.parse(data.toString('utf8')) as Record<string, unknown>
@@ -126,15 +135,32 @@ export class TwilioTransport implements Transport {
     switch (message.event) {
       case 'start': {
         const start = message.start as TwilioStartPayload
+        const nonce = start.customParameters?.nonce
+        const entry = nonce !== undefined && nonce !== '' ? this.callRegistry.take(nonce) : undefined
+
+        if (entry === undefined || entry.callSid !== start.callSid) {
+          this.log.warn(
+            {
+              claimedCallSid: start.callSid,
+              sourceAddress: this.request.socket?.remoteAddress
+            },
+            'twilio.rejected_start_frame'
+          )
+          // This close fires ws.on('close') above, which latches caller_hangup — not a security reason.
+          this.ws.close(1008, 'policy violation')
+          this.rejectReady(new ConnectionRejectedError('invalid nonce'))
+
+          return
+        }
+
         this._sessionId = start.callSid
         this.streamSid = start.streamSid
-        const params = start.customParameters ?? {}
-        this._callerNumber = params.From ?? params.from ?? null
+        this._callerNumber = entry.from
         this.log.info(
           { sessionId: this._sessionId, callerNumber: this._callerNumber },
           'twilio.stream_started'
         )
-        resolveReady()
+        this.resolveReady()
         break
       }
       case 'media': {
@@ -164,8 +190,12 @@ export const TWILIO_WS_PATH = '/twilio/media'
  * Factory used by the transport registry. Waits for the `start` event so the
  * `Transport` it hands back always has `sessionId`/`callerNumber` populated.
  */
-export async function createTwilioTransport(ws: WebSocket, request: IncomingMessage): Promise<TwilioTransport> {
-  const transport = new TwilioTransport(ws, request)
+export async function createTwilioTransport(
+  ws: RawSocket,
+  request: IncomingMessage,
+  callRegistry: CallRegistry
+): Promise<TwilioTransport> {
+  const transport = new TwilioTransport(ws, request, callRegistry)
   await transport.ready()
 
   return transport

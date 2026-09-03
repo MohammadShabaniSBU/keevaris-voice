@@ -1,8 +1,9 @@
-import { randomUUID } from 'node:crypto'
 import type { IncomingMessage } from 'node:http'
-import { WebSocket } from 'ws'
+import { ConnectionRejectedError } from '../../errors.js'
 import { logger } from '../../logger.js'
+import type { RawSocket } from '../RawSocket.js'
 import type { AudioFormat, Transport, TransportCloseReason } from '../Transport.js'
+import type { WebTokenService } from './WebToken.js'
 
 const AUDIO_INPUT: AudioFormat = { encoding: 'linear16', sampleRate: 16000 }
 const AUDIO_OUTPUT: AudioFormat = { encoding: 'linear16', sampleRate: 24000 }
@@ -10,8 +11,9 @@ const AUDIO_OUTPUT: AudioFormat = { encoding: 'linear16', sampleRate: 24000 }
 /**
  * Browser mic session (panel copilot, or `public/dev.html` for local
  * testing). No phone system in the middle, so there is no caller number and
- * no separate "ringing" webhook step — the session id is minted the moment
- * the socket connects, and the connection carries raw PCM16 audio directly.
+ * no separate "ringing" webhook step — the session id comes from the signed
+ * token minted before the socket connects, and the connection carries raw
+ * PCM16 audio directly.
  *
  * Wire protocol on this socket:
  *  - binary frames: PCM16 audio (mic in from the browser, agent audio out)
@@ -30,8 +32,11 @@ export class WebTransport implements Transport {
   private closed = false
   private readonly log
 
-  constructor(private readonly ws: WebSocket, _request: IncomingMessage) {
-    this.sessionId = randomUUID()
+  constructor(
+    private readonly ws: RawSocket,
+    sessionId: string
+  ) {
+    this.sessionId = sessionId
     this.log = logger.child({ component: 'web-transport', sessionId: this.sessionId })
 
     ws.on('message', (data: Buffer, isBinary: boolean) => {
@@ -58,13 +63,13 @@ export class WebTransport implements Transport {
   }
 
   sendAudio(chunk: Buffer): void {
-    if (this.ws.readyState === WebSocket.OPEN) {
+    if (this.ws.readyState === 1) {
       this.ws.send(chunk)
     }
   }
 
   clearAudio(): void {
-    if (this.ws.readyState === WebSocket.OPEN) {
+    if (this.ws.readyState === 1) {
       this.ws.send(JSON.stringify({ type: 'clear' }))
     }
   }
@@ -80,7 +85,7 @@ export class WebTransport implements Transport {
 
   async close(reason: TransportCloseReason): Promise<void> {
     this.emitClose(reason)
-    if (this.ws.readyState === WebSocket.OPEN) {
+    if (this.ws.readyState === 1) {
       this.ws.close()
     }
   }
@@ -94,6 +99,18 @@ export class WebTransport implements Transport {
 
 export const WEB_WS_PATH = '/web/media'
 
-export async function createWebTransport(ws: WebSocket, request: IncomingMessage): Promise<WebTransport> {
-  return new WebTransport(ws, request)
+export async function createWebTransport(
+  ws: RawSocket,
+  request: IncomingMessage,
+  tokenService: WebTokenService
+): Promise<WebTransport> {
+  const token = new URL(request.url ?? '', 'http://internal').searchParams.get('token')
+  const claims = tokenService.verify(token)
+  if (claims === null) {
+    logger.warn({ sourceAddress: request.socket?.remoteAddress }, 'web.rejected_connection')
+    ws.close(1008, 'policy violation')
+    throw new ConnectionRejectedError('invalid or expired token')
+  }
+
+  return new WebTransport(ws, claims.sessionId)
 }

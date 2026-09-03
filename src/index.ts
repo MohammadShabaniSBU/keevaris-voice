@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import path from 'node:path'
@@ -8,19 +8,35 @@ import { WebSocket, WebSocketServer } from 'ws'
 import { DeepgramVoiceAgent } from './agent/deepgram/DeepgramVoiceAgent.js'
 import { config } from './config.js'
 import { KeevarisClient } from './delegation/KeevarisClient.js'
+import { ConnectionRejectedError } from './errors.js'
 import { logger } from './logger.js'
+import { ConnectionGate } from './server/ConnectionGate.js'
 import { VoiceSession } from './session/VoiceSession.js'
 import { registerTransport, resolveTransportModule, type TransportModule } from './transport/registry.js'
+import { InProcessCallRegistry } from './transport/twilio/CallRegistry.js'
 import { createTwilioTransport, TWILIO_WS_PATH } from './transport/twilio/TwilioTransport.js'
 import { isValidTwilioSignature } from './transport/twilio/signature.js'
 import { buildStreamTwiml } from './transport/twilio/twiml.js'
+import { WebTokenService } from './transport/web/WebToken.js'
 import { createWebTransport, WEB_WS_PATH } from './transport/web/WebTransport.js'
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
 const publicDir = path.join(currentDir, '..', 'public')
 
-registerTransport({ vendor: 'twilio', wsPath: TWILIO_WS_PATH, createTransport: createTwilioTransport })
-registerTransport({ vendor: 'web', wsPath: WEB_WS_PATH, createTransport: createWebTransport })
+const callRegistry = new InProcessCallRegistry()
+const webTokenService = new WebTokenService(config.webToken.secret)
+const connectionGate = new ConnectionGate(config.maxConcurrentSessions)
+
+registerTransport({
+  vendor: 'twilio',
+  wsPath: TWILIO_WS_PATH,
+  createTransport: (ws, request) => createTwilioTransport(ws, request, callRegistry)
+})
+registerTransport({
+  vendor: 'web',
+  wsPath: WEB_WS_PATH,
+  createTransport: (ws, request) => createWebTransport(ws, request, webTokenService)
+})
 
 function toWebSocketUrl(httpUrl: string): string {
   return httpUrl.replace(/^http/, 'ws')
@@ -61,11 +77,20 @@ async function handleTwilioVoiceWebhook(request: IncomingMessage, response: Serv
     return
   }
 
+  const nonce = randomBytes(32).toString('hex')
+  callRegistry.put(
+    nonce,
+    {
+      callSid: params.CallSid ?? '',
+      from: params.From ?? '',
+      to: params.To ?? '',
+      createdAt: Date.now()
+    },
+    config.callRegistry.ttlMs
+  )
+
   const streamUrl = `${toWebSocketUrl(config.publicBaseUrl)}${TWILIO_WS_PATH}`
-  const twiml = buildStreamTwiml(streamUrl, {
-    From: params.From ?? '',
-    CallSid: params.CallSid ?? ''
-  })
+  const twiml = buildStreamTwiml(streamUrl, { nonce })
 
   logger.info({ callSid: params.CallSid, from: params.From }, 'twilio.voice_webhook')
   response.writeHead(200, { 'Content-Type': 'text/xml' })
@@ -83,10 +108,18 @@ async function handleHttpRequest(request: IncomingMessage, response: ServerRespo
       return
     }
 
-    if (request.method === 'GET' && (url.pathname === '/' || url.pathname === '/dev.html')) {
+    if (config.allowDevPage && request.method === 'GET' && (url.pathname === '/' || url.pathname === '/dev.html')) {
       const html = await readFile(path.join(publicDir, 'dev.html'), 'utf8')
       response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
       response.end(html)
+
+      return
+    }
+
+    if (config.allowDevPage && request.method === 'GET' && url.pathname === '/dev/token') {
+      const minted = webTokenService.mint('dev-page', config.webToken.ttlMs)
+      response.writeHead(200, { 'Content-Type': 'application/json' })
+      response.end(JSON.stringify(minted))
 
       return
     }
@@ -117,10 +150,12 @@ async function handleTransportConnection(module: TransportModule, ws: WebSocket,
     const session = new VoiceSession({ transport, agent, keevaris, companyName: config.companyName })
     await session.start()
   } catch (error) {
-    logger.error(
-      { connectionId, vendor: module.vendor, error: (error as Error).message },
-      'transport.connection_failed'
-    )
+    if (!(error instanceof ConnectionRejectedError)) {
+      logger.error(
+        { connectionId, vendor: module.vendor, error: (error as Error).message },
+        'transport.connection_failed'
+      )
+    }
     ws.close()
   }
 }
@@ -141,7 +176,22 @@ server.on('upgrade', (request, socket, head) => {
     return
   }
 
+  if (!connectionGate.tryAcquire()) {
+    logger.warn(
+      {
+        active: connectionGate.activeCount,
+        limit: config.maxConcurrentSessions,
+        pathname
+      },
+      'server.concurrency_ceiling_reached'
+    )
+    socket.destroy()
+
+    return
+  }
+
   wss.handleUpgrade(request, socket, head, (ws) => {
+    ws.on('close', () => connectionGate.release())
     void handleTransportConnection(module, ws, request)
   })
 })
