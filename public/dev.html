@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>keevaris-voice — web transport dev page</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+    button { font-size: 16px; padding: 8px 16px; }
+    #log { white-space: pre-wrap; background: #111; color: #ccc; padding: 12px; height: 320px; overflow-y: auto; font-family: monospace; font-size: 13px; margin-top: 16px; }
+    #status { font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>keevaris-voice — web transport</h1>
+  <p>
+    Connects your mic straight to <code>/web/media</code>. This is a raw test
+    harness for the <code>WebTransport</code> implementation — no UI polish,
+    no panel integration.
+  </p>
+  <p>Status: <span id="status">idle</span></p>
+  <button id="start">Start call</button>
+  <button id="stop" disabled>Stop</button>
+  <div id="log"></div>
+
+  <script type="module">
+    const MIC_SAMPLE_RATE = 16000
+    const PLAYBACK_SAMPLE_RATE = 24000
+
+    const statusEl = document.getElementById('status')
+    const logEl = document.getElementById('log')
+    const startButton = document.getElementById('start')
+    const stopButton = document.getElementById('stop')
+
+    let ws = null
+    let audioCtx = null
+    let micStream = null
+    let micNode = null
+    let nextPlaybackTime = 0
+
+    function log(line) {
+      logEl.textContent += `${new Date().toISOString().slice(11, 19)}  ${line}\n`
+      logEl.scrollTop = logEl.scrollHeight
+    }
+
+    function setStatus(value) {
+      statusEl.textContent = value
+    }
+
+    // Naive linear decimation float32 @ contextRate -> int16 @ targetRate.
+    // Good enough for a dev harness; not what production audio code should
+    // look like.
+    function downsampleToInt16(float32, sourceRate, targetRate) {
+      const ratio = sourceRate / targetRate
+      const outLength = Math.floor(float32.length / ratio)
+      const out = new Int16Array(outLength)
+      for (let i = 0; i < outLength; i++) {
+        const sample = float32[Math.floor(i * ratio)]
+        const clamped = Math.max(-1, Math.min(1, sample))
+        out[i] = clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff
+      }
+
+      return out
+    }
+
+    function playInt16(int16, sampleRate) {
+      const float32 = new Float32Array(int16.length)
+      for (let i = 0; i < int16.length; i++) {
+        float32[i] = int16[i] / (int16[i] < 0 ? 0x8000 : 0x7fff)
+      }
+
+      const buffer = audioCtx.createBuffer(1, float32.length, sampleRate)
+      buffer.copyToChannel(float32, 0)
+
+      const source = audioCtx.createBufferSource()
+      source.buffer = buffer
+
+      source.connect(audioCtx.destination)
+      const startAt = Math.max(audioCtx.currentTime, nextPlaybackTime)
+      source.start(startAt)
+      nextPlaybackTime = startAt + buffer.duration
+    }
+
+    async function start() {
+      startButton.disabled = true
+      setStatus('connecting')
+
+      const wsUrl = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/web/media`
+      ws = new WebSocket(wsUrl)
+      ws.binaryType = 'arraybuffer'
+
+      ws.addEventListener('open', () => {
+        log('ws open')
+        setStatus('connected')
+        stopButton.disabled = false
+      })
+
+      ws.addEventListener('message', (event) => {
+        if (typeof event.data === 'string') {
+          const message = JSON.parse(event.data)
+          if (message.type === 'clear') {
+            nextPlaybackTime = audioCtx.currentTime
+            log('control: clear (barge-in)')
+          }
+
+          return
+        }
+
+        playInt16(new Int16Array(event.data), PLAYBACK_SAMPLE_RATE)
+      })
+
+      ws.addEventListener('close', () => {
+        log('ws closed')
+        setStatus('idle')
+        stopButton.disabled = true
+        startButton.disabled = false
+      })
+
+      ws.addEventListener('error', (event) => log(`ws error: ${event.message ?? 'unknown'}`))
+
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      audioCtx = new AudioContext()
+      nextPlaybackTime = audioCtx.currentTime
+
+      const source = audioCtx.createMediaStreamSource(micStream)
+      // ScriptProcessorNode is deprecated but needs no separate worklet
+      // file, which keeps this dev harness a single page.
+      micNode = audioCtx.createScriptProcessor(4096, 1, 1)
+      micNode.onaudioprocess = (event) => {
+        if (ws?.readyState !== WebSocket.OPEN) return
+        const input = event.inputBuffer.getChannelData(0)
+        const pcm16 = downsampleToInt16(input, audioCtx.sampleRate, MIC_SAMPLE_RATE)
+        ws.send(pcm16.buffer)
+      }
+
+      source.connect(micNode)
+      // ScriptProcessorNode only fires onaudioprocess while connected
+      // downstream; we don't want to hear our own mic, so this is a silent
+      // sink rather than routing to destination.
+      const silentSink = audioCtx.createGain()
+      silentSink.gain.value = 0
+      micNode.connect(silentSink)
+      silentSink.connect(audioCtx.destination)
+      log('mic capture started')
+    }
+
+    async function stop() {
+      ws?.close()
+      micNode?.disconnect()
+      micStream?.getTracks().forEach((track) => track.stop())
+      await audioCtx?.close()
+      ws = null
+      audioCtx = null
+      micStream = null
+      micNode = null
+    }
+
+    startButton.addEventListener('click', () => start().catch((error) => log(`start failed: ${error.message}`)))
+    stopButton.addEventListener('click', () => stop().catch((error) => log(`stop failed: ${error.message}`)))
+  </script>
+</body>
+</html>
