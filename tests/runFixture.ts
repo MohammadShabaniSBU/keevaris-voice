@@ -23,7 +23,8 @@ export function assertFixtureLog(
   log: Array<EventLogEntry>,
   expect: CallFixture['expect'],
   forbid: CallFixture['forbid'],
-  count: CallFixture['count']
+  count: CallFixture['count'],
+  forbidContent: CallFixture['forbidContent'] = []
 ): void {
   const observed = JSON.stringify(log, null, 2)
   const positions: Array<number> = []
@@ -59,6 +60,27 @@ export function assertFixtureLog(
       throw new Error(
         `count[${index}] expected exactly ${counted.exactly}, found ${n}: ${JSON.stringify(counted)}\nobserved:\n${observed}`
       )
+    }
+  }
+
+  for (const [index, guard] of forbidContent.entries()) {
+    const { notContaining, ...filter } = guard
+    const matched = log.filter((entry) => entryMatches(entry, filter))
+    if (matched.length === 0) {
+      throw new Error(
+        `forbidContent[${index}] matched no log entries: ${JSON.stringify(filter)}\nobserved:\n${observed}`
+      )
+    }
+
+    for (const entry of matched) {
+      const text = typeof entry.content === 'string' ? entry.content : ''
+      for (const needle of notContaining) {
+        if (text.includes(needle)) {
+          throw new Error(
+            `forbidContent[${index}] found ${JSON.stringify(needle)} in ${JSON.stringify(entry)}\nobserved:\n${observed}`
+          )
+        }
+      }
     }
   }
 }
@@ -161,7 +183,7 @@ export async function runFixture(fixture: CallFixture, t: TestContext): Promise<
 
     await drain()
 
-    assertFixtureLog(log.entries, fixture.expect, fixture.forbid, fixture.count)
+    assertFixtureLog(log.entries, fixture.expect, fixture.forbid, fixture.count, fixture.forbidContent)
 
     if (fixture.assertTimersClearAfter) {
       const before = log.entries.length

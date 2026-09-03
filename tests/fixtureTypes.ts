@@ -24,9 +24,18 @@ export const logMatcherSchema = z.object({
   kind: z.string(),
   messageType: z.string().optional(),
   functionCallId: z.string().optional(),
+  content: z.string().optional(),
   bytes: z.number().optional(),
   reason: z.string().optional(),
   destinationNumber: z.string().optional()
+})
+
+const contentGuardSchema = z.object({
+  on: z.enum(['transport', 'agentSocket', 'session']),
+  kind: z.string(),
+  messageType: z.string().optional(),
+  functionCallId: z.string().optional(),
+  notContaining: z.array(z.string()).min(1)
 })
 
 const callerEventSchema = z.object({
@@ -89,6 +98,7 @@ export const fixtureSchema = z.object({
   ),
   expect: z.array(logMatcherSchema),
   forbid: z.array(logMatcherSchema.extend({ before: z.number().int().nonnegative() })).default([]),
+  forbidContent: z.array(contentGuardSchema).default([]),
   count: z.array(logMatcherSchema.extend({ exactly: z.number().int().nonnegative() })).default([]),
   assertTimersClearAfter: z.boolean().default(false)
 })

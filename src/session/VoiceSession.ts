@@ -17,6 +17,19 @@ interface FunctionCall {
   arguments: string
 }
 
+interface DelegationResultForCall {
+  call: FunctionCall
+  text: string
+  transfer: boolean
+  destination: string | undefined
+}
+
+function buildFunctionCallStub(result: DelegationResultForCall): string {
+  return result.transfer
+    ? 'Answered. The caller is being transferred.'
+    : 'Answered. Continue the conversation naturally.'
+}
+
 type SessionState =
   | { status: 'connecting' | 'active' | 'closing' | 'closed' }
   | { status: 'transferring'; destination: string | undefined }
@@ -200,12 +213,12 @@ export class VoiceSession {
       return
     }
 
-    for (const result of results) {
-      agent.respondToFunctionCall(result.call.id, result.call.name, result.text)
-    }
+    const answerText = results.map((result) => result.text).join('\n')
+    agent.injectAgentMessage(answerText)
+    this.enqueueSpeech('answer')
 
-    if (needsDelegation) {
-      this.enqueueSpeech('answer')
+    for (const result of results) {
+      agent.respondToFunctionCall(result.call.id, result.call.name, buildFunctionCallStub(result))
     }
 
     this.armTransferIfRequested(results)

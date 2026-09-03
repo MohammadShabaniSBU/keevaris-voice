@@ -1,16 +1,15 @@
 {
-  "name": "two-function-calls-one-request",
-  "note": "Finding 9. One FunctionCallRequest with two entries: one filler plus one combined answer InjectAgentMessage, FunctionCallResponse in listed order, transfer armed because the second call requested one.",
+  "name": "two-delegated-answers-one-request",
+  "note": "V02-00. One FunctionCallRequest with two delegated answers, neither transferring: one filler, one newline-joined InjectAgentMessage carrying both texts, FunctionCallResponse stubs contain neither figure.",
   "delegation": {
     "responses": [
       {
-        "text": "We have 10 by 10 units available.",
+        "text": "We have 4 units available in that size.",
         "transfer": false
       },
       {
-        "text": "I am transferring you to the front desk.",
-        "transfer": true,
-        "destination": "main_line"
+        "text": "A 10 by 10 is one hundred twenty a month.",
+        "transfer": false
       }
     ]
   },
@@ -28,7 +27,7 @@
           {
             "id": "fc_1",
             "name": "ask_keevaris",
-            "arguments": "{\"query\":\"do you have 10 by 10 units?\"}",
+            "arguments": "{\"query\":\"how many 10 by 10 units?\"}",
             "client_side": true
           },
           {
@@ -45,11 +44,10 @@
     { "at": 400, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } }
   ],
   "expect": [
-    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "content": "We have 10 by 10 units available.\nI am transferring you to the front desk." },
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "content": "We have 4 units available in that size.\nA 10 by 10 is one hundred twenty a month." },
     { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse", "functionCallId": "fc_1" },
     { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse", "functionCallId": "fc_2" },
-    { "on": "transport", "kind": "sendAudio" },
-    { "on": "transport", "kind": "transfer" }
+    { "on": "transport", "kind": "sendAudio" }
   ],
   "forbidContent": [
     {
@@ -57,17 +55,19 @@
       "kind": "send",
       "messageType": "FunctionCallResponse",
       "functionCallId": "fc_1",
-      "notContaining": ["We have 10 by 10 units available.", "10"]
+      "notContaining": ["We have 4 units available in that size.", "4", "10", "120"]
     },
     {
       "on": "agentSocket",
       "kind": "send",
       "messageType": "FunctionCallResponse",
       "functionCallId": "fc_2",
-      "notContaining": ["I am transferring you to the front desk.", "10"]
+      "notContaining": ["A 10 by 10 is one hundred twenty a month.", "4", "10", "120"]
     }
   ],
   "count": [
-    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "exactly": 2 }
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "exactly": 2 },
+    { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse", "exactly": 2 },
+    { "on": "transport", "kind": "transfer", "exactly": 0 }
   ]
 }

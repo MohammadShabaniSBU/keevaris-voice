@@ -241,3 +241,64 @@ test('one FunctionCallRequest with two entries emits one functionCalls event', a
   })
   await agent.close()
 })
+
+test('injectAgentMessage sends queue behavior and the message field', async () => {
+  const log = new EventLog()
+  let socket: DeepgramSocketDouble | undefined
+
+  const agent = new DeepgramVoiceAgent('sess_inject_wire', 'Keevaris', () => {
+    socket = new DeepgramSocketDouble(log)
+    return socket
+  })
+
+  const startPromise = agent.start(AUDIO, AUDIO)
+  startPromise.catch(() => {})
+  await drain()
+
+  assert.ok(socket)
+  socket.simulateOpen()
+  socket.sendControl({ type: 'SettingsApplied' })
+  await drain()
+  await startPromise
+
+  agent.injectAgentMessage('some text')
+  const last = socket.sentTextFrames[socket.sentTextFrames.length - 1]
+  assert.equal(typeof last, 'string')
+  assert.deepEqual(JSON.parse(last as string), {
+    type: 'InjectAgentMessage',
+    behavior: 'queue',
+    message: 'some text'
+  })
+  await agent.close()
+})
+
+test('InjectionRefused does not emit an AgentEvent', async () => {
+  const log = new EventLog()
+  let socket: DeepgramSocketDouble | undefined
+
+  const agent = new DeepgramVoiceAgent('sess_injection_refused', 'Keevaris', () => {
+    socket = new DeepgramSocketDouble(log)
+    return socket
+  })
+
+  const startPromise = agent.start(AUDIO, AUDIO)
+  startPromise.catch(() => {})
+  await drain()
+
+  assert.ok(socket)
+  socket.simulateOpen()
+  socket.sendControl({ type: 'SettingsApplied' })
+  await drain()
+  await startPromise
+
+  const received: Array<AgentEvent> = []
+  agent.onEvent((event) => {
+    received.push(event)
+  })
+
+  socket.sendControl({ type: 'InjectionRefused' })
+  await drain()
+
+  assert.deepEqual(received, [])
+  await agent.close()
+})

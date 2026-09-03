@@ -18,6 +18,7 @@ test('ordered expect passes', () => {
       { on: 'transport', kind: 'transfer' }
     ],
     [],
+    [],
     []
   )
 })
@@ -31,6 +32,7 @@ test('swapped expect fails', () => {
           { on: 'transport', kind: 'transfer' },
           { on: 'transport', kind: 'sendAudio' }
         ],
+        [],
         [],
         []
       ),
@@ -49,6 +51,7 @@ test('forbid violation fails', () => {
         transferFirst,
         [{ on: 'transport', kind: 'sendAudio' }],
         [{ on: 'transport', kind: 'transfer', before: 0 }],
+        [],
         []
       ),
     /forbid\[0\] matched/
@@ -66,8 +69,30 @@ test('count violation fails', () => {
         doubled,
         [{ on: 'agentSocket', kind: 'send', messageType: 'InjectAgentMessage' }],
         [],
-        [{ on: 'agentSocket', kind: 'send', messageType: 'InjectAgentMessage', exactly: 1 }]
+        [{ on: 'agentSocket', kind: 'send', messageType: 'InjectAgentMessage', exactly: 1 }],
+        []
       ),
     /count\[0\] expected exactly 1, found 2/
+  )
+})
+
+test('forbidContent with no matching entries fails', () => {
+  assert.throws(
+    () =>
+      assertFixtureLog(
+        log,
+        [{ on: 'agentSocket', kind: 'send', messageType: 'InjectAgentMessage' }],
+        [],
+        [],
+        [
+          {
+            on: 'agentSocket',
+            kind: 'send',
+            messageType: 'DoesNotExist',
+            notContaining: ['8am']
+          }
+        ]
+      ),
+    /forbidContent\[0\] matched no log entries/
   )
 })

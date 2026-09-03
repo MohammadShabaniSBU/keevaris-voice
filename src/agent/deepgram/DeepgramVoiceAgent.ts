@@ -153,7 +153,7 @@ export class DeepgramVoiceAgent implements AgentProvider {
   }
 
   injectAgentMessage(text: string): void {
-    this.send({ type: 'InjectAgentMessage', content: text })
+    this.send({ type: 'InjectAgentMessage', behavior: 'queue', message: text })
   }
 
   respondToFunctionCall(id: string, name: string, output: string): void {
@@ -206,6 +206,15 @@ export class DeepgramVoiceAgent implements AgentProvider {
         return false
       case 'AgentAudioDone':
         this.emit({ type: 'agentAudioDone' })
+
+        return false
+      case 'InjectionRefused':
+        // `behavior: 'queue'` still refuses when the caller is mid-speech.
+        // The answer then never reaches the caller even though the think
+        // model already received the "Answered" stub. Not solved here —
+        // emitting `'error'` would tear the whole call down over one
+        // dropped injection.
+        this.log.warn({}, 'deepgram.injection_refused')
 
         return false
       case 'Error': {

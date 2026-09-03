@@ -21,7 +21,11 @@ export type AgentEvent =
 export interface AgentProvider {
   start(input: AudioFormat, output: AudioFormat): Promise<void>
   sendAudio(chunk: Buffer): void
-  /** Latency filler while a functionCall is being resolved. */
+  /**
+   * Speak `text` verbatim — filler while a function call is in flight, or
+   * the delegated answer itself. Deepgram's think model never sees this
+   * string; it goes out as InjectAgentMessage.
+   */
   injectAgentMessage(text: string): void
   respondToFunctionCall(id: string, name: string, output: string): void
   onEvent(handler: (event: AgentEvent) => void): void

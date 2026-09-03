@@ -30,12 +30,20 @@
     { "at": 300, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } }
   ],
   "expect": [
-    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage" },
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "content": "We are open from 8am to 6pm." },
     { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse" },
     { "on": "transport", "kind": "sendAudio" }
   ],
+  "forbidContent": [
+    {
+      "on": "agentSocket",
+      "kind": "send",
+      "messageType": "FunctionCallResponse",
+      "notContaining": ["We are open from 8am to 6pm.", "8am", "6pm"]
+    }
+  ],
   "count": [
-    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "exactly": 1 },
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "exactly": 2 },
     { "on": "transport", "kind": "transfer", "exactly": 0 }
   ]
 }

@@ -11,6 +11,7 @@ import type { EventLog } from './EventLog.js'
 export class DeepgramSocketDouble implements DeepgramSocket {
   readyState: number = WebSocket.CONNECTING
   readonly sentAudioChunks: Array<Buffer> = []
+  readonly sentTextFrames: Array<string> = []
 
   private readonly emitter = new EventEmitter()
 
@@ -38,15 +39,23 @@ export class DeepgramSocketDouble implements DeepgramSocket {
       return
     }
 
+    this.sentTextFrames.push(data)
+
     let messageType = 'unknown'
     let functionCallId: string | undefined
+    let content: string | undefined
     try {
-      const parsed = JSON.parse(data) as { type?: unknown; id?: unknown }
+      const parsed = JSON.parse(data) as { type?: unknown; id?: unknown; message?: unknown; content?: unknown }
       if (typeof parsed.type === 'string') {
         messageType = parsed.type
       }
       if (typeof parsed.id === 'string') {
         functionCallId = parsed.id
+      }
+      if (typeof parsed.message === 'string') {
+        content = parsed.message
+      } else if (typeof parsed.content === 'string') {
+        content = parsed.content
       }
     } catch {
       messageType = 'unparseable'
@@ -56,7 +65,8 @@ export class DeepgramSocketDouble implements DeepgramSocket {
       on: 'agentSocket',
       kind: 'send',
       messageType,
-      ...(functionCallId !== undefined ? { functionCallId } : {})
+      ...(functionCallId !== undefined ? { functionCallId } : {}),
+      ...(content !== undefined ? { content } : {})
     })
   }
 
