@@ -6,6 +6,11 @@ import type { AgentEvent, AgentProvider } from '../AgentProvider.js'
 import { buildSettingsMessage } from './settings.js'
 
 const DEEPGRAM_AGENT_URL = 'wss://agent.deepgram.com/v1/agent/converse'
+const PREBUFFER_SECONDS = 2
+
+function bytesPerSecond(format: AudioFormat): number {
+  return format.sampleRate * (format.encoding === 'linear16' ? 2 : 1)
+}
 
 export interface DeepgramSocket {
   readonly readyState: number
@@ -45,6 +50,11 @@ export class DeepgramVoiceAgent implements AgentProvider {
   private closeRequested = false
   private keepAliveTimer: ReturnType<typeof setInterval> | undefined
   private audioSentSinceLastTick = false
+  private inputFormat: AudioFormat | undefined
+  private readonly prebuffer: Array<Buffer> = []
+  private prebufferedBytes = 0
+  private droppedPrebufferChunks = 0
+  private readyForAudio = false
   private readonly log
 
   constructor(
@@ -64,6 +74,7 @@ export class DeepgramVoiceAgent implements AgentProvider {
   }
 
   async start(input: AudioFormat, output: AudioFormat): Promise<void> {
+    this.inputFormat = input
     const ws = this.socketFactory(DEEPGRAM_AGENT_URL, {
       headers: { Authorization: `Token ${config.deepgram.apiKey}` }
     })
@@ -110,6 +121,7 @@ export class DeepgramVoiceAgent implements AgentProvider {
 
         const appliedNow = this.handleControlMessage(data.toString('utf8'))
         if (appliedNow) {
+          this.flushPrebuffer(ws)
           settleResolve()
         }
       })
@@ -129,6 +141,11 @@ export class DeepgramVoiceAgent implements AgentProvider {
   }
 
   sendAudio(chunk: Buffer): void {
+    if (!this.readyForAudio) {
+      this.enqueuePrebuffer(chunk)
+      return
+    }
+
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(chunk)
       this.audioSentSinceLastTick = true
@@ -231,6 +248,52 @@ export class DeepgramVoiceAgent implements AgentProvider {
       arguments: typeof args === 'string' ? args : JSON.stringify(args ?? {}),
       client_side: clientSide
     }
+  }
+
+  private enqueuePrebuffer(chunk: Buffer): void {
+    this.prebuffer.push(chunk)
+    this.prebufferedBytes += chunk.length
+
+    const format = this.inputFormat
+    if (format === undefined) {
+      return
+    }
+
+    const cap = PREBUFFER_SECONDS * bytesPerSecond(format)
+    while (this.prebufferedBytes > cap && this.prebuffer.length > 0) {
+      const dropped = this.prebuffer.shift()
+      if (dropped === undefined) {
+        break
+      }
+
+      this.prebufferedBytes -= dropped.length
+      this.droppedPrebufferChunks += 1
+      this.log.warn(
+        { droppedBytes: dropped.length, totalDroppedChunks: this.droppedPrebufferChunks },
+        'deepgram.prebuffer_overflow'
+      )
+    }
+  }
+
+  private flushPrebuffer(ws: DeepgramSocket): void {
+    this.readyForAudio = true
+
+    if (this.prebuffer.length === 0) {
+      return
+    }
+
+    const bytes = this.prebufferedBytes
+    const format = this.inputFormat
+    const durationMs =
+      format === undefined ? 0 : Math.round((bytes / bytesPerSecond(format)) * 1000)
+    this.log.info({ bytes, durationMs }, 'deepgram.prebuffer_flushed')
+
+    for (const chunk of this.prebuffer) {
+      ws.send(chunk)
+    }
+    this.audioSentSinceLastTick = true
+    this.prebuffer.length = 0
+    this.prebufferedBytes = 0
   }
 
   private send(payload: Record<string, unknown>): void {

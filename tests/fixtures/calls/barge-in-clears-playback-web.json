@@ -1,0 +1,21 @@
+{
+  "name": "barge-in-clears-playback-web",
+  "vendor": "web",
+  "callerNumber": null,
+  "note": "UserStartedSpeaking must flush playback on the web transport (a {type:clear} text frame).",
+  "audio": {
+    "input": { "encoding": "linear16", "sampleRate": 16000 },
+    "output": { "encoding": "linear16", "sampleRate": 24000 }
+  },
+  "events": [
+    { "at": 0, "from": "agentSocket", "kind": "open" },
+    { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
+    { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
+    { "at": 100, "from": "agentSocket", "kind": "audio", "bytes": 480 },
+    { "at": 200, "from": "agentSocket", "kind": "control", "message": { "type": "UserStartedSpeaking" } }
+  ],
+  "expect": [
+    { "on": "transport", "kind": "sendAudio" },
+    { "on": "transport", "kind": "clearAudio" }
+  ]
+}

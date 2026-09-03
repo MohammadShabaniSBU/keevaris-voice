@@ -1,0 +1,15 @@
+{
+  "name": "barge-in-clears-playback",
+  "note": "UserStartedSpeaking must flush playback on the Twilio transport (a Twilio clear event).",
+  "events": [
+    { "at": 0, "from": "agentSocket", "kind": "open" },
+    { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
+    { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
+    { "at": 100, "from": "agentSocket", "kind": "audio", "bytes": 320 },
+    { "at": 200, "from": "agentSocket", "kind": "control", "message": { "type": "UserStartedSpeaking" } }
+  ],
+  "expect": [
+    { "on": "transport", "kind": "sendAudio" },
+    { "on": "transport", "kind": "clearAudio" }
+  ]
+}

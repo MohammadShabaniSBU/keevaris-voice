@@ -10,6 +10,7 @@ import type { EventLog } from './EventLog.js'
  */
 export class DeepgramSocketDouble implements DeepgramSocket {
   readyState: number = WebSocket.CONNECTING
+  readonly sentAudioChunks: Array<Buffer> = []
 
   private readonly emitter = new EventEmitter()
 
@@ -32,6 +33,7 @@ export class DeepgramSocketDouble implements DeepgramSocket {
 
   send(data: string | Buffer): void {
     if (typeof data !== 'string') {
+      this.sentAudioChunks.push(data)
       this.log.push({ on: 'agentSocket', kind: 'sendAudio', bytes: data.length })
       return
     }

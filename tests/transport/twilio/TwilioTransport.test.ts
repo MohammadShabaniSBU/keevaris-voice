@@ -135,3 +135,31 @@ test('valid nonce resolves callerNumber from registry', async () => {
   assert.equal(transport.sessionId, 'CA123')
   assert.equal(transport.callerNumber, '+15555550100')
 })
+
+test('clearAudio sends a Twilio clear event with the streamSid', async () => {
+  const ws = new FakeRawSocket()
+  const registry = new InProcessCallRegistry(() => 1_000)
+  registry.put(
+    'nonce-1',
+    {
+      callSid: 'CA123',
+      from: '+15555550100',
+      to: '+15555550999',
+      createdAt: 1_000
+    },
+    60_000
+  )
+
+  const transport = new TwilioTransport(ws, buildRequest(), registry)
+  const readyPromise = transport.ready()
+  ws.emitMessage(buildStartFrame({ callSid: 'CA123', nonce: 'nonce-1' }))
+  await readyPromise
+
+  transport.clearAudio()
+
+  assert.equal(ws.sent.length, 1)
+  assert.deepEqual(JSON.parse(ws.sent[0] as string), {
+    event: 'clear',
+    streamSid: 'MZ123'
+  })
+})

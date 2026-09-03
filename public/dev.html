@@ -36,6 +36,7 @@
     let micStream = null
     let micNode = null
     let nextPlaybackTime = 0
+    let scheduledSources = []
 
     function log(line) {
       logEl.textContent += `${new Date().toISOString().slice(11, 19)}  ${line}\n`
@@ -76,6 +77,10 @@
 
       source.connect(audioCtx.destination)
       const startAt = Math.max(audioCtx.currentTime, nextPlaybackTime)
+      source.onended = () => {
+        scheduledSources = scheduledSources.filter((entry) => entry !== source)
+      }
+      scheduledSources.push(source)
       source.start(startAt)
       nextPlaybackTime = startAt + buffer.duration
     }
@@ -103,6 +108,14 @@
         if (typeof event.data === 'string') {
           const message = JSON.parse(event.data)
           if (message.type === 'clear') {
+            for (const source of scheduledSources) {
+              try {
+                source.stop()
+              } catch {
+                // already stopped
+              }
+            }
+            scheduledSources = []
             nextPlaybackTime = audioCtx.currentTime
             log('control: clear (barge-in)')
           }
@@ -157,6 +170,7 @@
       audioCtx = null
       micStream = null
       micNode = null
+      scheduledSources = []
     }
 
     startButton.addEventListener('click', () => start().catch((error) => log(`start failed: ${error.message}`)))

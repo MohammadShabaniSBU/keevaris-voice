@@ -62,3 +62,13 @@ test('createWebTransport accepts valid token and uses sessionId from claims', as
   assert.equal(transport.sessionId, minted.sessionId)
   assert.equal(transport.callerNumber, null)
 })
+
+test('clearAudio sends a JSON clear text frame', () => {
+  const ws = new FakeRawSocket()
+  const transport = new WebTransport(ws, 'sess_clear')
+
+  transport.clearAudio()
+
+  assert.equal(ws.sent.length, 1)
+  assert.deepEqual(JSON.parse(ws.sent[0] as string), { type: 'clear' })
+})
