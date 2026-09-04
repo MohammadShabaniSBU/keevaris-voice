@@ -7,6 +7,7 @@ import { BridgeConfigClientStub } from './support/BridgeConfigClientStub.js'
 import { DeepgramSocketDouble } from './support/DeepgramSocketDouble.js'
 import { FakeTransport } from './support/FakeTransport.js'
 import { KeevarisClientStub } from './support/KeevarisClientStub.js'
+import { SessionLifecycleClientStub } from './support/SessionLifecycleClientStub.js'
 import type { CallFixture, LogMatcher } from './fixtureTypes.js'
 
 export function entryMatches(entry: EventLogEntry, matcher: LogMatcher): boolean {
@@ -112,7 +113,9 @@ export async function runFixture(fixture: CallFixture, t: TestContext): Promise<
 
   let socket: DeepgramSocketDouble | undefined
   const keevaris = new KeevarisClientStub(fixture.delegation, log)
+  const sessionLifecycle = new SessionLifecycleClientStub(fixture.sessionLifecycle, log)
   const bridgeConfig = await new BridgeConfigClientStub(fixture.bridgeConfig, log).fetchConfig()
+  await sessionLifecycle.open(fixture.sessionId, fixture.callerNumber)
 
   if (fixture.preState?.transportClosed !== undefined) {
     transport.simulateClose(fixture.preState.transportClosed)
@@ -134,6 +137,7 @@ export async function runFixture(fixture: CallFixture, t: TestContext): Promise<
     transport,
     agent,
     keevaris,
+    sessionLifecycle,
     filler: bridgeConfig.filler,
     transfer: bridgeConfig.transfer
   })

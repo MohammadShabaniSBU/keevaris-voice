@@ -19,8 +19,17 @@ const closeReasonSchema = z.enum([
   'idle_timeout'
 ])
 
+const logOnSchema = z.enum([
+  'transport',
+  'agentSocket',
+  'session',
+  'delegation',
+  'bridgeConfig',
+  'sessionLifecycle'
+])
+
 export const logMatcherSchema = z.object({
-  on: z.enum(['transport', 'agentSocket', 'session', 'delegation', 'bridgeConfig']),
+  on: logOnSchema,
   kind: z.string(),
   messageType: z.string().optional(),
   functionCallId: z.string().optional(),
@@ -31,12 +40,14 @@ export const logMatcherSchema = z.object({
   reason: z.string().optional(),
   destinationNumber: z.string().optional(),
   callerUtterance: z.string().nullable().optional(),
+  callerNumber: z.string().nullable().optional(),
+  bridgeSessionId: z.string().optional(),
   turnId: z.string().optional(),
   clientFallback: z.boolean().optional()
 })
 
 const contentGuardSchema = z.object({
-  on: z.enum(['transport', 'agentSocket', 'session', 'delegation', 'bridgeConfig']),
+  on: logOnSchema,
   kind: z.string(),
   messageType: z.string().optional(),
   functionCallId: z.string().optional(),
@@ -119,6 +130,11 @@ export const fixtureSchema = z.object({
           maxCallDurationMinutes: z.number()
         })
         .optional(),
+      reject: z.boolean().optional()
+    })
+    .default({}),
+  sessionLifecycle: z
+    .object({
       reject: z.boolean().optional()
     })
     .default({}),

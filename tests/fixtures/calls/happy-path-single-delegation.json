@@ -30,6 +30,7 @@
     { "at": 300, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } }
   ],
   "expect": [
+    { "on": "sessionLifecycle", "kind": "open", "callerNumber": "+15555550100" },
     { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "content": "We are open from 8am to 6pm." },
     { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse" },
     { "on": "transport", "kind": "sendAudio" }
@@ -45,6 +46,7 @@
   "count": [
     { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "exactly": 2 },
     { "on": "transport", "kind": "transfer", "exactly": 0 },
-    { "on": "session", "kind": "session.delegation_result", "clientFallback": false, "exactly": 1 }
+    { "on": "session", "kind": "session.delegation_result", "clientFallback": false, "exactly": 1 },
+    { "on": "sessionLifecycle", "kind": "open", "exactly": 1 }
   ]
 }

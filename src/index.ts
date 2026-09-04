@@ -12,6 +12,7 @@ import { ConnectionRejectedError } from './errors.js'
 import { logger } from './logger.js'
 import { ConnectionGate } from './server/ConnectionGate.js'
 import { handleTwilioVoiceWebhook } from './server/twilioVoiceWebhook.js'
+import { SessionLifecycleClient } from './session/SessionLifecycleClient.js'
 import { VoiceSession } from './session/VoiceSession.js'
 import { registerTransport, resolveTransportModule, type TransportModule } from './transport/registry.js'
 import { InProcessCallRegistry } from './transport/twilio/CallRegistry.js'
@@ -84,7 +85,11 @@ async function handleTransportConnection(module: TransportModule, ws: WebSocket,
 
   try {
     const transport = await module.createTransport(ws, request)
-    const bridgeConfig = await new BridgeConfigClient(transport.bridgeCredentials).fetchConfig()
+    const sessionLifecycle = new SessionLifecycleClient(transport.bridgeCredentials)
+    const [bridgeConfig] = await Promise.all([
+      new BridgeConfigClient(transport.bridgeCredentials).fetchConfig(),
+      sessionLifecycle.open(transport.sessionId, transport.callerNumber)
+    ])
     const agent = new DeepgramVoiceAgent(transport.sessionId, {
       greeting: bridgeConfig.greeting,
       promptAdditions: bridgeConfig.promptAdditions
@@ -95,6 +100,7 @@ async function handleTransportConnection(module: TransportModule, ws: WebSocket,
       transport,
       agent,
       keevaris,
+      sessionLifecycle,
       filler: bridgeConfig.filler,
       transfer: bridgeConfig.transfer
     })

@@ -26,7 +26,7 @@ Enforced by: `TwilioTransport.emitClose` / `WebTransport.emitClose` (`closedReas
 
 Fixture: `tests/fixtures/calls/hangup-during-agent-handshake.json` (`assertTimersClearAfter: true`) — transport already closed before `VoiceSession` exists; the late `onClose` fires, `closeRequested` closes the agent socket that opens afterwards, no `Settings` frame goes out, no timer outlives the call. `tests/agent/deepgram/DeepgramVoiceAgent.test.ts` (`close during CONNECTING…`) covers the agent half alone.
 
-**V4. No session starts from an unauthenticated socket, and the caller number never comes from client-supplied data.** It comes from the signature-validated `/twilio/voice` webhook by way of the call registry. Anything else is an identity claim, and `VoiceBridgeTurn::audienceAllows` treats it as authentication. On `/web/media` the session id comes from a signed token, not from `randomUUID()` in the constructor.
+**V4. No session starts from an unauthenticated socket, and the caller number never comes from client-supplied data.** It comes from the signature-validated `/twilio/voice` webhook by way of the call registry. Anything else is an identity claim, and `VoiceSessionOpener::audienceAllows` treats it as authentication. On `/web/media` the session id comes from a signed token, not from `randomUUID()` in the constructor.
 
 Enforced by: `handleTwilioVoiceWebhook` + `InProcessCallRegistry` (`src/index.ts`, `src/transport/twilio/CallRegistry.ts`); `TwilioTransport` reading `callerNumber` from `CallRegistry.take` only; `WebTokenService` + `createWebTransport` (`src/transport/web/WebToken.ts`, `src/transport/web/WebTransport.ts`); `ConnectionGate` at upgrade (`src/server/ConnectionGate.ts`). `GET /dev/token` is registered only when `ALLOW_DEV_PAGE` is true.
 

@@ -51,8 +51,8 @@ export function attachSessionLogSink(sink: SessionLogSink | undefined): void {
  * transfer) to the AgentProvider (fast conversation, function calls) and
  * resolves every `ask_keevaris` function call through KeevarisClient.
  *
- * All state here is per-call and in-memory; the only durable record of the
- * call is whatever unit-hq-api itself writes when we delegate to it.
+ * All state here is per-call and in-memory. The durable session row is
+ * opened at connection start and closed from teardown via SessionLifecycleClient.
  */
 export class VoiceSession {
   private readonly log
@@ -325,7 +325,11 @@ export class VoiceSession {
 
     this.state = { status: 'closing' }
     this.clearTimers()
-    await Promise.allSettled([this.deps.transport.close(reason), this.deps.agent.close()])
+    await Promise.allSettled([
+      this.deps.transport.close(reason),
+      this.deps.agent.close(),
+      this.deps.sessionLifecycle.end(this.deps.transport.sessionId, reason)
+    ])
     this.state = { status: 'closed' }
   }
 

@@ -8,7 +8,11 @@
     { "at": 300001, "from": "caller", "kind": "audio", "bytes": 160 }
   ],
   "expect": [
-    { "on": "transport", "kind": "close", "reason": "idle_timeout" }
+    { "on": "transport", "kind": "close", "reason": "idle_timeout" },
+    { "on": "sessionLifecycle", "kind": "end", "reason": "idle_timeout" }
+  ],
+  "count": [
+    { "on": "sessionLifecycle", "kind": "end", "exactly": 1 }
   ],
   "assertTimersClearAfter": true
 }
