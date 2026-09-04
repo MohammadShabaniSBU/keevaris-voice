@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { WebSocket, WebSocketServer } from 'ws'
 import { DeepgramVoiceAgent } from './agent/deepgram/DeepgramVoiceAgent.js'
 import { config, defaultVoiceBridgePhoneNumber } from './config.js'
+import { BridgeConfigClient } from './config/BridgeConfigClient.js'
 import { KeevarisClient } from './delegation/KeevarisClient.js'
 import { ConnectionRejectedError } from './errors.js'
 import { logger } from './logger.js'
@@ -83,10 +84,20 @@ async function handleTransportConnection(module: TransportModule, ws: WebSocket,
 
   try {
     const transport = await module.createTransport(ws, request)
-    const agent = new DeepgramVoiceAgent(transport.sessionId, config.companyName)
+    const bridgeConfig = await new BridgeConfigClient(transport.bridgeCredentials).fetchConfig()
+    const agent = new DeepgramVoiceAgent(transport.sessionId, {
+      greeting: bridgeConfig.greeting,
+      promptAdditions: bridgeConfig.promptAdditions
+    })
     const keevaris = new KeevarisClient(transport.bridgeCredentials)
 
-    const session = new VoiceSession({ transport, agent, keevaris, companyName: config.companyName })
+    const session = new VoiceSession({
+      transport,
+      agent,
+      keevaris,
+      filler: bridgeConfig.filler,
+      transfer: bridgeConfig.transfer
+    })
     await session.start()
   } catch (error) {
     if (!(error instanceof ConnectionRejectedError)) {

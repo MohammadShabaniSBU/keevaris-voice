@@ -59,7 +59,7 @@ export class DeepgramVoiceAgent implements AgentProvider {
 
   constructor(
     private readonly sessionId: string,
-    private readonly companyName: string,
+    private readonly options: { greeting: string; promptAdditions: Array<string> },
     private readonly socketFactory: DeepgramSocketFactory = (url, options) =>
       new WebSocket(url, options)
   ) {
@@ -108,7 +108,7 @@ export class DeepgramVoiceAgent implements AgentProvider {
         }
 
         this.log.info({}, 'deepgram.connected')
-        ws.send(JSON.stringify(buildSettingsMessage(input, output, { companyName: this.companyName })))
+        ws.send(JSON.stringify(buildSettingsMessage(input, output, this.options)))
         this.startKeepAlive()
       })
 

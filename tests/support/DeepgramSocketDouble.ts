@@ -44,8 +44,16 @@ export class DeepgramSocketDouble implements DeepgramSocket {
     let messageType = 'unknown'
     let functionCallId: string | undefined
     let content: string | undefined
+    let greeting: string | undefined
+    let prompt: string | undefined
     try {
-      const parsed = JSON.parse(data) as { type?: unknown; id?: unknown; message?: unknown; content?: unknown }
+      const parsed = JSON.parse(data) as {
+        type?: unknown
+        id?: unknown
+        message?: unknown
+        content?: unknown
+        agent?: { greeting?: unknown; think?: { prompt?: unknown } }
+      }
       if (typeof parsed.type === 'string') {
         messageType = parsed.type
       }
@@ -57,6 +65,8 @@ export class DeepgramSocketDouble implements DeepgramSocket {
       } else if (typeof parsed.content === 'string') {
         content = parsed.content
       }
+      greeting = typeof parsed.agent?.greeting === 'string' ? parsed.agent.greeting : undefined
+      prompt = typeof parsed.agent?.think?.prompt === 'string' ? parsed.agent.think.prompt : undefined
     } catch {
       messageType = 'unparseable'
     }
@@ -66,7 +76,9 @@ export class DeepgramSocketDouble implements DeepgramSocket {
       kind: 'send',
       messageType,
       ...(functionCallId !== undefined ? { functionCallId } : {}),
-      ...(content !== undefined ? { content } : {})
+      ...(content !== undefined ? { content } : {}),
+      ...(greeting !== undefined ? { greeting } : {}),
+      ...(prompt !== undefined ? { prompt } : {})
     })
   }
 

@@ -44,11 +44,11 @@ Fixture: `tests/fixtures/calls/happy-path-single-delegation.json` and `tests/fix
 
 **V6. There is one source of truth for prompt, greeting, and filler, and it is `unit-hq-api`.** A local copy is a defect even when it is faster.
 
-**Currently violated.** `src/agent/prompt.ts` is an explicit local copy of `VoiceBridgeCustomerConfig`, and `COMPANY_NAME` is read from process env (`src/config.ts`). Both stay until V03-01 (`GET /api/voice/bridge/{token}/config`). Do not "fix" the copy halfway by fetching at boot from a half-built endpoint, and do not add a second local copy.
+**Closed in V03-03.** `BridgeConfigClient` fetches `GET /api/voice/bridge/{token}/config` once per call; `prompt.ts`'s `GREETING_EN`/`FILLER_EN` and the hand-written prompt-additions list are gone. `COMPANY_NAME` and the transfer-number env vars remain as fallback-only defaults when the fetch fails — the call still proceeds in English rather than dropping. A config change on the API side takes effect on the next call, not the current one.
 
-Enforced by: nothing yet. Closing task: V03-01.
+Enforced by: `BridgeConfigClient`, `handleTransportConnection` (`src/index.ts`).
 
-Fixture: none until the config endpoint exists. The violation is the file `src/agent/prompt.ts` itself.
+Fixture: `tests/fixtures/calls/bridge-config-drives-greeting-and-prompt.json` asserts a non-default greeting, filler, and `promptAdditions` reach `Settings` and `InjectAgentMessage`. `tests/fixtures/calls/bridge-config-fetch-failure-falls-back.json` asserts a failed fetch logs `bridge_config.fetch_failed` and still starts the call with the English fallback.
 
 **V7. An ordering fix ships with a fixture that fails without it.** Every defect in sprint 01 was a timing relationship, and a timing relationship that is not asserted is not fixed. `tests/runFixture.ts` + `tests/calls.test.ts` replay `tests/fixtures/calls/*.json` against doubles; a new ordering bug adds a fixture there, not a prose reproduction.
 

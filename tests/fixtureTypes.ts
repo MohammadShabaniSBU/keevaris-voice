@@ -20,11 +20,13 @@ const closeReasonSchema = z.enum([
 ])
 
 export const logMatcherSchema = z.object({
-  on: z.enum(['transport', 'agentSocket', 'session', 'delegation']),
+  on: z.enum(['transport', 'agentSocket', 'session', 'delegation', 'bridgeConfig']),
   kind: z.string(),
   messageType: z.string().optional(),
   functionCallId: z.string().optional(),
   content: z.string().optional(),
+  greeting: z.string().optional(),
+  prompt: z.string().optional(),
   bytes: z.number().optional(),
   reason: z.string().optional(),
   destinationNumber: z.string().optional(),
@@ -34,7 +36,7 @@ export const logMatcherSchema = z.object({
 })
 
 const contentGuardSchema = z.object({
-  on: z.enum(['transport', 'agentSocket', 'session', 'delegation']),
+  on: z.enum(['transport', 'agentSocket', 'session', 'delegation', 'bridgeConfig']),
   kind: z.string(),
   messageType: z.string().optional(),
   functionCallId: z.string().optional(),
@@ -98,6 +100,25 @@ export const fixtureSchema = z.object({
       delayMs: z.number().nonnegative().optional(),
       response: delegationResponseSchema.optional(),
       responses: z.array(delegationResponseSchema).optional(),
+      reject: z.boolean().optional()
+    })
+    .default({}),
+  bridgeConfig: z
+    .object({
+      response: z
+        .object({
+          companyName: z.string(),
+          locale: z.string(),
+          greeting: z.string(),
+          filler: z.string(),
+          promptAdditions: z.array(z.string()),
+          transfer: z.object({
+            mainLineNumber: z.string().nullable(),
+            voicemailNumber: z.string().nullable()
+          }),
+          maxCallDurationMinutes: z.number()
+        })
+        .optional(),
       reject: z.boolean().optional()
     })
     .default({}),

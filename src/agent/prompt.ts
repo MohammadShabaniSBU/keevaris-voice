@@ -1,24 +1,3 @@
-/**
- * Local copy of the prompt shape from unit-hq-api's VoiceBridgeCustomerConfig
- * (docs/roadmap/sprint-28-customer-facing-voice-via-vocal-bridge-delegation/
- * vb-customer-config.json). Kept here rather than fetched at boot so this
- * service has zero runtime dependency on unit-hq-api beyond the delegation
- * call itself.
- *
- * Follow-up, not part of this sketch: serve this from an API endpoint so
- * there is one source of truth and the greeting can vary by site locale
- * instead of being fixed to English here.
- */
-
-export const GREETING_EN = 'I am an automated assistant for {company}.'
-
-/**
- * Latency filler spoken via `InjectAgentMessage` while a delegation is in
- * flight. Same accessor family as `buildGreeting` so V03-03 replaces one
- * source rather than hunting string literals. Not localised here.
- */
-export const FILLER_EN = 'Let me check that for you.'
-
 export const ASK_KEEVARIS_FUNCTION_NAME = 'ask_keevaris'
 
 /**
@@ -42,33 +21,16 @@ export const ASK_KEEVARIS_DESCRIPTION =
   'text back to the caller exactly as given — do not paraphrase or shorten it.'
 
 /**
- * Spoken directly by Deepgram as `agent.greeting` — not routed through the
- * LLM — so the disclosure line is guaranteed verbatim rather than at the
- * mercy of the think-model paraphrasing it (S28-05's "verbatim" invariant,
- * applied here instead of via Vocal Bridge's "External TTS" setting).
+ * Structural instructions this service owns (opening-disclosure handling,
+ * answer-in-the-caller's-language). Content constraints come from
+ * `promptAdditions`, served by unit-hq-api.
  */
-export function buildGreeting(companyName: string): string {
-  return GREETING_EN.replace('{company}', companyName)
-}
-
-export function buildFiller(): string {
-  return FILLER_EN
-}
-
-export function buildSystemPrompt(): string {
+export function buildSystemPrompt(promptAdditions: Array<string>): string {
   return [
     'The opening disclosure line has already been spoken to the caller before you receive any ' +
       'input. Do not repeat it, and do not say anything before the caller speaks.',
     'Answer in the language the caller is speaking, even if it differs from the opening line\'s ' +
       'language.',
-    'Never state a price, rate, discount, availability count, unit size, size range, date, balance, ' +
-      'invoice figure, unit number, or access code yourself. Describe availability and sizes only in ' +
-      'general terms (for example, "a range of sizes are available") and delegate any question ' +
-      `needing an exact figure by calling ${ASK_KEEVARIS_FUNCTION_NAME}.`,
-    'Never answer a question about a specific customer\'s account from memory. Delegate it.',
-    'Never speculate about what the company offers. Delegate it.',
-    'When you receive a delegated answer, speak it back exactly as given.',
-    'Do not read digits, dates, or ranges aloud from your own reasoning — only speak numbers that ' +
-      'came back from a delegated answer.'
+    ...promptAdditions
   ].join('\n')
 }

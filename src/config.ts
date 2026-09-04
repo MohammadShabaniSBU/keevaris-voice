@@ -83,11 +83,11 @@ const envSchema = z.object({
     .default('true')
     .transform((value) => value !== 'false'),
 
+  // Fallback only — used when BridgeConfigClient.fetchConfig() fails.
   TRANSFER_MAIN_LINE_NUMBER: z.string().default(''),
   TRANSFER_VOICEMAIL_NUMBER: z.string().default(''),
 
-  // Placeholder until the greeting is served from unit-hq-api and can carry
-  // the operator's real registered name per VoiceBridgeCustomerConfig.
+  // Fallback only — used when BridgeConfigClient.fetchConfig() fails.
   COMPANY_NAME: z.string().default('Keevaris'),
 
   ALLOW_DEV_PAGE: z

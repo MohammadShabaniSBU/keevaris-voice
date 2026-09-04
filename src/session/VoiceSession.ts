@@ -1,5 +1,4 @@
 import type { AgentEvent } from '../agent/AgentProvider.js'
-import { buildFiller } from '../agent/prompt.js'
 import { config } from '../config.js'
 import { logger } from '../logger.js'
 import type { DelegationResponse } from '../delegation/types.js'
@@ -180,7 +179,7 @@ export class VoiceSession {
     const needsDelegation = parsed.some((entry) => entry.query !== '')
     if (needsDelegation) {
       this.enqueueSpeech('filler')
-      agent.injectAgentMessage(buildFiller())
+      agent.injectAgentMessage(this.deps.filler)
     }
 
     const results = await Promise.all(
@@ -308,7 +307,7 @@ export class VoiceSession {
 
     const destination = this.state.destination
     const { transport } = this.deps
-    await runTransfer(transport, destination, transport.sessionId)
+    await runTransfer(transport, destination, transport.sessionId, this.deps.transfer)
     await this.teardown('transferred')
   }
 

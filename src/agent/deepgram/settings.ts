@@ -1,9 +1,10 @@
 import { config } from '../../config.js'
 import type { AudioFormat } from '../../transport/Transport.js'
-import { ASK_KEEVARIS_DESCRIPTION, ASK_KEEVARIS_FUNCTION_NAME, buildGreeting, buildSystemPrompt } from '../prompt.js'
+import { ASK_KEEVARIS_DESCRIPTION, ASK_KEEVARIS_FUNCTION_NAME, buildSystemPrompt } from '../prompt.js'
 
 export interface DeepgramSettingsOptions {
-  companyName: string
+  greeting: string
+  promptAdditions: Array<string>
 }
 
 /**
@@ -31,7 +32,7 @@ export function buildSettingsMessage(input: AudioFormat, output: AudioFormat, op
       },
       think: {
         provider: { type: config.deepgram.thinkProvider, model: config.deepgram.thinkModel },
-        prompt: buildSystemPrompt(),
+        prompt: buildSystemPrompt(options.promptAdditions),
         functions: [
           {
             name: ASK_KEEVARIS_FUNCTION_NAME,
@@ -52,7 +53,7 @@ export function buildSettingsMessage(input: AudioFormat, output: AudioFormat, op
       speak: {
         provider: { type: 'deepgram', version: 'v2', model: config.deepgram.speakModel }
       },
-      greeting: buildGreeting(options.companyName)
+      greeting: options.greeting
     }
   }
 }

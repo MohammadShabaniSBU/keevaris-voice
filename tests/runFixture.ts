@@ -1,9 +1,9 @@
 import type { TestContext } from 'node:test'
 import { DeepgramVoiceAgent } from '../src/agent/deepgram/DeepgramVoiceAgent.js'
-import { config } from '../src/config.js'
 import { attachSessionLogSink, VoiceSession } from '../src/session/VoiceSession.js'
 import type { EventLogEntry } from './support/EventLog.js'
 import { EventLog } from './support/EventLog.js'
+import { BridgeConfigClientStub } from './support/BridgeConfigClientStub.js'
 import { DeepgramSocketDouble } from './support/DeepgramSocketDouble.js'
 import { FakeTransport } from './support/FakeTransport.js'
 import { KeevarisClientStub } from './support/KeevarisClientStub.js'
@@ -73,7 +73,9 @@ export function assertFixtureLog(
     }
 
     for (const entry of matched) {
-      const text = typeof entry.content === 'string' ? entry.content : ''
+      const text = [entry.content, entry.greeting, entry.prompt]
+        .filter((value): value is string => typeof value === 'string')
+        .join('\n')
       for (const needle of notContaining) {
         if (text.includes(needle)) {
           throw new Error(
@@ -110,21 +112,30 @@ export async function runFixture(fixture: CallFixture, t: TestContext): Promise<
 
   let socket: DeepgramSocketDouble | undefined
   const keevaris = new KeevarisClientStub(fixture.delegation, log)
+  const bridgeConfig = await new BridgeConfigClientStub(fixture.bridgeConfig, log).fetchConfig()
 
   if (fixture.preState?.transportClosed !== undefined) {
     transport.simulateClose(fixture.preState.transportClosed)
   }
 
-  const agent = new DeepgramVoiceAgent(fixture.sessionId, config.companyName, () => {
-    socket = new DeepgramSocketDouble(log)
-    return socket
-  })
+  const agent = new DeepgramVoiceAgent(
+    fixture.sessionId,
+    {
+      greeting: bridgeConfig.greeting,
+      promptAdditions: bridgeConfig.promptAdditions
+    },
+    () => {
+      socket = new DeepgramSocketDouble(log)
+      return socket
+    }
+  )
 
   const session = new VoiceSession({
     transport,
     agent,
     keevaris,
-    companyName: config.companyName
+    filler: bridgeConfig.filler,
+    transfer: bridgeConfig.transfer
   })
 
   const sessionStartPromise = session.start()

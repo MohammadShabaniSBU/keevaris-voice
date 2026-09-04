@@ -1,5 +1,5 @@
-import { config } from '../config.js'
 import { logger } from '../logger.js'
+import type { BridgeConfig } from '../config/types.js'
 import type { Transport } from '../transport/Transport.js'
 
 /**
@@ -12,10 +12,12 @@ function isTransferDestination(value: string): value is TransferDestination {
   return value === 'main_line' || value === 'voicemail'
 }
 
-function numberFor(destination: TransferDestination): string {
-  return destination === 'main_line'
-    ? config.transfer.mainLineNumber
-    : config.transfer.voicemailNumber
+function numberFor(
+  destination: TransferDestination,
+  transfer: BridgeConfig['transfer']
+): string {
+  const number = destination === 'main_line' ? transfer.mainLineNumber : transfer.voicemailNumber
+  return number ?? ''
 }
 
 /**
@@ -27,11 +29,12 @@ function numberFor(destination: TransferDestination): string {
 export async function runTransfer(
   transport: Transport,
   destination: string | undefined,
-  sessionId: string
+  sessionId: string,
+  transfer: BridgeConfig['transfer']
 ): Promise<void> {
   const resolved: TransferDestination =
     destination !== undefined && isTransferDestination(destination) ? destination : 'main_line'
-  const number = numberFor(resolved)
+  const number = numberFor(resolved, transfer)
 
   if (number === '') {
     logger.warn({ sessionId, destination: resolved }, 'transfer.destination_not_configured')

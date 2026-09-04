@@ -1,4 +1,4 @@
-export type EventLogOn = 'transport' | 'agentSocket' | 'session' | 'delegation'
+export type EventLogOn = 'transport' | 'agentSocket' | 'session' | 'delegation' | 'bridgeConfig'
 
 export interface EventLogEntry {
   t: number

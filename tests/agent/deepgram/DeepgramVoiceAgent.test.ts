@@ -6,6 +6,7 @@ import { EventLog } from '../../support/EventLog.js'
 import { DeepgramSocketDouble } from '../../support/DeepgramSocketDouble.js'
 
 const AUDIO = { encoding: 'mulaw' as const, sampleRate: 8000 }
+const AGENT_OPTIONS = { greeting: 'I am an automated assistant for Keevaris.', promptAdditions: [] }
 
 function drain(): Promise<void> {
   return new Promise((resolve) => {
@@ -17,7 +18,7 @@ test('close during CONNECTING closes the socket when it opens and start() reject
   const log = new EventLog()
   let socket: DeepgramSocketDouble | undefined
 
-  const agent = new DeepgramVoiceAgent('sess_connecting', 'Keevaris', () => {
+  const agent = new DeepgramVoiceAgent('sess_connecting', AGENT_OPTIONS, () => {
     socket = new DeepgramSocketDouble(log)
     return socket
   })
@@ -44,7 +45,7 @@ test('audio arriving before SettingsApplied is buffered and not sent', async () 
   const log = new EventLog()
   let socket: DeepgramSocketDouble | undefined
 
-  const agent = new DeepgramVoiceAgent('sess_prebuffer', 'Keevaris', () => {
+  const agent = new DeepgramVoiceAgent('sess_prebuffer', AGENT_OPTIONS, () => {
     socket = new DeepgramSocketDouble(log)
     return socket
   })
@@ -77,7 +78,7 @@ test('SettingsApplied flushes buffered audio in order and byte-identical', async
   const log = new EventLog()
   let socket: DeepgramSocketDouble | undefined
 
-  const agent = new DeepgramVoiceAgent('sess_flush', 'Keevaris', () => {
+  const agent = new DeepgramVoiceAgent('sess_flush', AGENT_OPTIONS, () => {
     socket = new DeepgramSocketDouble(log)
     return socket
   })
@@ -107,7 +108,7 @@ test('prebuffer overflow drops the oldest chunk and keeps the most recent', asyn
   const log = new EventLog()
   let socket: DeepgramSocketDouble | undefined
 
-  const agent = new DeepgramVoiceAgent('sess_overflow', 'Keevaris', () => {
+  const agent = new DeepgramVoiceAgent('sess_overflow', AGENT_OPTIONS, () => {
     socket = new DeepgramSocketDouble(log)
     return socket
   })
@@ -141,7 +142,7 @@ test('sendAudio after SettingsApplied is sent live, not re-queued', async () => 
   const log = new EventLog()
   let socket: DeepgramSocketDouble | undefined
 
-  const agent = new DeepgramVoiceAgent('sess_live', 'Keevaris', () => {
+  const agent = new DeepgramVoiceAgent('sess_live', AGENT_OPTIONS, () => {
     socket = new DeepgramSocketDouble(log)
     return socket
   })
@@ -168,7 +169,7 @@ test('onEvent registered after closed fires immediately, exactly once', async ()
   const log = new EventLog()
   let socket: DeepgramSocketDouble | undefined
 
-  const agent = new DeepgramVoiceAgent('sess_late_closed', 'Keevaris', () => {
+  const agent = new DeepgramVoiceAgent('sess_late_closed', AGENT_OPTIONS, () => {
     socket = new DeepgramSocketDouble(log)
     return socket
   })
@@ -201,7 +202,7 @@ test('one FunctionCallRequest with two entries emits one functionCalls event', a
   const log = new EventLog()
   let socket: DeepgramSocketDouble | undefined
 
-  const agent = new DeepgramVoiceAgent('sess_two_calls', 'Keevaris', () => {
+  const agent = new DeepgramVoiceAgent('sess_two_calls', AGENT_OPTIONS, () => {
     socket = new DeepgramSocketDouble(log)
     return socket
   })
@@ -246,7 +247,7 @@ test('injectAgentMessage sends queue behavior and the message field', async () =
   const log = new EventLog()
   let socket: DeepgramSocketDouble | undefined
 
-  const agent = new DeepgramVoiceAgent('sess_inject_wire', 'Keevaris', () => {
+  const agent = new DeepgramVoiceAgent('sess_inject_wire', AGENT_OPTIONS, () => {
     socket = new DeepgramSocketDouble(log)
     return socket
   })
@@ -276,7 +277,7 @@ test('InjectionRefused does not emit an AgentEvent', async () => {
   const log = new EventLog()
   let socket: DeepgramSocketDouble | undefined
 
-  const agent = new DeepgramVoiceAgent('sess_injection_refused', 'Keevaris', () => {
+  const agent = new DeepgramVoiceAgent('sess_injection_refused', AGENT_OPTIONS, () => {
     socket = new DeepgramSocketDouble(log)
     return socket
   })

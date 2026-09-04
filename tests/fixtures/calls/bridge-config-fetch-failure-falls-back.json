@@ -1,0 +1,46 @@
+{
+  "name": "bridge-config-fetch-failure-falls-back",
+  "note": "V03-03. Config stub rejects; the call still proceeds with English fallback greeting and logs bridge_config.fetch_failed.",
+  "bridgeConfig": {
+    "reject": true
+  },
+  "delegation": {
+    "response": {
+      "text": "We are open from 8am to 6pm.",
+      "transfer": false
+    }
+  },
+  "events": [
+    { "at": 0, "from": "agentSocket", "kind": "open" },
+    { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
+    { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
+    {
+      "at": 100,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "FunctionCallRequest",
+        "functions": [
+          {
+            "id": "fc_1",
+            "name": "ask_keevaris",
+            "arguments": "{\"query\":\"what are your hours?\"}",
+            "client_side": true
+          }
+        ]
+      }
+    },
+    { "at": 200, "from": "agentSocket", "kind": "audio", "bytes": 320 },
+    { "at": 300, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } }
+  ],
+  "expect": [
+    { "on": "bridgeConfig", "kind": "bridge_config.fetch_failed" },
+    {
+      "on": "agentSocket",
+      "kind": "send",
+      "messageType": "Settings",
+      "greeting": "I am an automated assistant for Keevaris."
+    },
+    { "on": "transport", "kind": "sendAudio" }
+  ]
+}
