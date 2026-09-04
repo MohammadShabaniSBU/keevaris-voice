@@ -32,13 +32,15 @@ Enforced by: `handleTwilioVoiceWebhook` + `InProcessCallRegistry` (`src/index.ts
 
 Fixture: `tests/transport/twilio/TwilioTransport.test.ts` (forged `start` frame, replayed nonce, `CallSid` mismatch); `tests/transport/twilio/CallRegistry.test.ts`; `tests/transport/web/WebToken.test.ts`; `tests/server/ConnectionGate.test.ts`.
 
-**V5. The fast model never speaks a figure that did not come back from a delegated answer.** Prices, availability, dates, balances, unit numbers, access codes. Enforced in the prompt today (`buildSystemPrompt` in `src/agent/prompt.ts`); enforced mechanically from V02-00.
+**V5. The fast model never speaks a figure that did not come back from a delegated answer.** Prices, availability, dates, balances, unit numbers, access codes. Enforced in the prompt (`buildSystemPrompt` in `src/agent/prompt.ts`) and mechanically: `VoiceSession.handleFunctionCalls` speaks the delegated answer via `agent.injectAgentMessage(result.text)`, bypassing the think model entirely. `FunctionCallResponse` carries only `buildFunctionCallStub(result)`, a fixed acknowledgement string — never the answer text or any figure from it.
 
 This is a restatement of the API's **invariant 55** ("No money, date, or unit identifier in agent output originates from the model") and must stay in sync with it rather than drift. Sprint-01 task text called this "invariant 73"; that was draft numbering from `S28-02` and never landed in `09`. The rule in `unit-hq-api/docs/09-conventions-and-invariants.md` is 55.
 
-Enforced by: `buildSystemPrompt` / `ASK_KEEVARIS_DESCRIPTION` (prompt-level, today). Mechanical enforcement is V02-00. On the API side: `GroundingGuard` + `GroundingGuardTest`.
+Enforced by: `VoiceSession.handleFunctionCalls` (`src/session/VoiceSession.ts`), `buildFunctionCallStub`, `DeepgramVoiceAgent.injectAgentMessage` / `respondToFunctionCall`.
 
-Fixture: none on this side yet that can catch a spoken figure the model invented — that is V02-00's job. The prompt text is the current control. Until then, treat a change that weakens the "never state a price…" paragraph as a V5 break.
+Fixture: `tests/fixtures/calls/happy-path-single-delegation.json` and `tests/fixtures/calls/two-delegated-answers-one-request.json` assert `InjectAgentMessage` carries the verbatim answer text and `FunctionCallResponse` never contains it (`forbidContent`, per-call via `functionCallId` in the two-answer case).
+
+**Note (V02-01 scope boundary).** `caller_utterance` now flows from this service (`VoiceSession.lastCallerUtterance` → `DelegationRequest.caller_utterance`) to `unit-hq-api`, which persists it on `voice_session_turns`. It is not yet used in grounding or query resolution — its presence on the wire does not mean it is load-bearing in `AgentRuntime` today. Follow-up (wiring it into grounding) belongs to whoever next scopes `AgentRuntime` work, not to this repo.
 
 **V6. There is one source of truth for prompt, greeting, and filler, and it is `unit-hq-api`.** A local copy is a defect even when it is faster.
 

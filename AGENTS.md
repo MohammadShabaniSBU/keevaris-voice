@@ -12,7 +12,7 @@ Before writing code, consult the doc that matches the task:
 | Transport / vendor / audio format | `docs/conventions-and-invariants.md` (V1, V2) |
 | Socket / session lifecycle / close / timers | `docs/conventions-and-invariants.md` (V3) |
 | Connection auth / caller identity | `docs/conventions-and-invariants.md` (V4) and `unit-hq-api/docs/09-conventions-and-invariants.md` (invariants 72, 59) |
-| What the fast model is allowed to say | `docs/conventions-and-invariants.md` (V5) and `unit-hq-api/docs/09-conventions-and-invariants.md` (invariant 55) |
+| What the fast model is allowed to say | `docs/conventions-and-invariants.md` (V5, incl. `happy-path-single-delegation.json` / `two-delegated-answers-one-request.json` fixtures) and `unit-hq-api/docs/09-conventions-and-invariants.md` (invariant 55) |
 | Prompt / greeting / filler | `docs/conventions-and-invariants.md` (V6) |
 | Ordering or lifecycle defect | `docs/conventions-and-invariants.md` (V7) |
 | Delegation contract, outbound guards, `AgentRuntime` | `unit-hq-api/docs/09-conventions-and-invariants.md` — this repo does not reinterpret it |
