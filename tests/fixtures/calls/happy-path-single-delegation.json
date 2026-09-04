@@ -1,6 +1,8 @@
 {
   "name": "happy-path-single-delegation",
+  "note": "V04-01. ConversationText + delayed ask so filler echo lands before the delegated segment. Hangup flushes the buffer.",
   "delegation": {
+    "delayMs": 80,
     "response": {
       "text": "We are open from 8am to 6pm.",
       "transfer": false
@@ -10,6 +12,16 @@
     { "at": 0, "from": "agentSocket", "kind": "open" },
     { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
     { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
+    {
+      "at": 50,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "user",
+        "content": "what are your hours?"
+      }
+    },
     {
       "at": 100,
       "from": "agentSocket",
@@ -26,14 +38,28 @@
         ]
       }
     },
+    {
+      "at": 150,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "assistant",
+        "content": "Let me check that for you."
+      }
+    },
     { "at": 200, "from": "agentSocket", "kind": "audio", "bytes": 320 },
-    { "at": 300, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } }
+    { "at": 300, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } },
+    { "at": 400, "from": "caller", "kind": "close", "reason": "caller_hangup" }
   ],
   "expect": [
     { "on": "sessionLifecycle", "kind": "open", "callerNumber": "+15555550100" },
     { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "content": "We are open from 8am to 6pm." },
     { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse" },
-    { "on": "transport", "kind": "sendAudio" }
+    { "on": "transport", "kind": "sendAudio" },
+    { "on": "transcript", "kind": "segment", "role": "caller", "source": "stt", "content": "what are your hours?" },
+    { "on": "transcript", "kind": "segment", "role": "agent", "source": "fast_model", "content": "Let me check that for you." },
+    { "on": "transcript", "kind": "segment", "role": "agent", "source": "delegated", "content": "We are open from 8am to 6pm.", "turnId": "sess_fixture:1:0" }
   ],
   "forbidContent": [
     {
@@ -47,6 +73,10 @@
     { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "exactly": 2 },
     { "on": "transport", "kind": "transfer", "exactly": 0 },
     { "on": "session", "kind": "session.delegation_result", "clientFallback": false, "exactly": 1 },
-    { "on": "sessionLifecycle", "kind": "open", "exactly": 1 }
+    { "on": "sessionLifecycle", "kind": "open", "exactly": 1 },
+    { "on": "transcript", "kind": "segment", "source": "stt", "exactly": 1 },
+    { "on": "transcript", "kind": "segment", "source": "fast_model", "exactly": 1 },
+    { "on": "transcript", "kind": "segment", "source": "delegated", "exactly": 1 },
+    { "on": "transcript", "kind": "flush", "exactly": 1 }
   ]
 }

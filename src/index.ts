@@ -13,6 +13,7 @@ import { logger } from './logger.js'
 import { ConnectionGate } from './server/ConnectionGate.js'
 import { handleTwilioVoiceWebhook } from './server/twilioVoiceWebhook.js'
 import { SessionLifecycleClient } from './session/SessionLifecycleClient.js'
+import { TranscriptClient } from './session/TranscriptClient.js'
 import { VoiceSession } from './session/VoiceSession.js'
 import { registerTransport, resolveTransportModule, type TransportModule } from './transport/registry.js'
 import { InProcessCallRegistry } from './transport/twilio/CallRegistry.js'
@@ -86,6 +87,7 @@ async function handleTransportConnection(module: TransportModule, ws: WebSocket,
   try {
     const transport = await module.createTransport(ws, request)
     const sessionLifecycle = new SessionLifecycleClient(transport.bridgeCredentials)
+    const transcript = new TranscriptClient(transport.bridgeCredentials)
     const [bridgeConfig] = await Promise.all([
       new BridgeConfigClient(transport.bridgeCredentials).fetchConfig(),
       sessionLifecycle.open(transport.sessionId, transport.callerNumber)
@@ -101,6 +103,7 @@ async function handleTransportConnection(module: TransportModule, ws: WebSocket,
       agent,
       keevaris,
       sessionLifecycle,
+      transcript,
       filler: bridgeConfig.filler,
       transfer: bridgeConfig.transfer
     })

@@ -25,7 +25,8 @@ const logOnSchema = z.enum([
   'session',
   'delegation',
   'bridgeConfig',
-  'sessionLifecycle'
+  'sessionLifecycle',
+  'transcript'
 ])
 
 export const logMatcherSchema = z.object({
@@ -43,7 +44,10 @@ export const logMatcherSchema = z.object({
   callerNumber: z.string().nullable().optional(),
   bridgeSessionId: z.string().optional(),
   turnId: z.string().optional(),
-  clientFallback: z.boolean().optional()
+  clientFallback: z.boolean().optional(),
+  role: z.string().optional(),
+  source: z.string().optional(),
+  sequence: z.number().optional()
 })
 
 const contentGuardSchema = z.object({
@@ -134,6 +138,11 @@ export const fixtureSchema = z.object({
     })
     .default({}),
   sessionLifecycle: z
+    .object({
+      reject: z.boolean().optional()
+    })
+    .default({}),
+  transcript: z
     .object({
       reject: z.boolean().optional()
     })

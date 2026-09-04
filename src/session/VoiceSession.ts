@@ -4,7 +4,7 @@ import { logger } from '../logger.js'
 import type { DelegationResponse } from '../delegation/types.js'
 import { runTransfer } from '../transfer/TransferPolicy.js'
 import type { TransportCloseReason } from '../transport/Transport.js'
-import type { VoiceSessionDeps } from './types.js'
+import type { TranscriptSegment, VoiceSessionDeps } from './types.js'
 
 interface AskKeevarisArguments {
   query?: string
@@ -62,6 +62,8 @@ export class VoiceSession {
   private transferDispatched = false
   private lastCallerUtterance: string | undefined
   private turnSequence = 0
+  private transcriptSequence = 0
+  private readonly transcriptBuffer: Array<TranscriptSegment> = []
   /**
    * Set only by `transport.onClose`. `'error'` as a close reason is
    * ambiguous — both a dead Twilio socket and a dead Deepgram socket
@@ -129,6 +131,11 @@ export class VoiceSession {
         if (event.role === 'user') {
           this.lastCallerUtterance = event.text
         }
+        this.pushTranscript({
+          role: event.role === 'user' ? 'caller' : 'agent',
+          text: event.text,
+          source: event.role === 'user' ? 'stt' : 'fast_model'
+        })
         this.log.info(
           { sessionId: this.deps.transport.sessionId, role: event.role, text: event.text },
           'session.transcript'
@@ -226,6 +233,19 @@ export class VoiceSession {
     }
 
     const answerText = results.map((result) => result.text).join('\n')
+    for (const [index, result] of results.entries()) {
+      const entry = parsed[index]
+      if (entry === undefined || entry.query === '') {
+        continue
+      }
+
+      this.pushTranscript({
+        role: 'agent',
+        text: result.text,
+        source: 'delegated',
+        turn_id: `${turnId}:${index}`
+      })
+    }
     agent.injectAgentMessage(answerText)
     this.enqueueSpeech('answer')
 
@@ -328,7 +348,8 @@ export class VoiceSession {
     await Promise.allSettled([
       this.deps.transport.close(reason),
       this.deps.agent.close(),
-      this.deps.sessionLifecycle.end(this.deps.transport.sessionId, reason)
+      this.deps.sessionLifecycle.end(this.deps.transport.sessionId, reason),
+      this.deps.transcript.flush(this.deps.transport.sessionId, this.transcriptBuffer)
     ])
     this.state = { status: 'closed' }
   }
@@ -381,6 +402,15 @@ export class VoiceSession {
     }
 
     this.clearTransferDeadline()
+  }
+
+  private pushTranscript(segment: Omit<TranscriptSegment, 'sequence' | 'occurred_at'>): void {
+    this.transcriptSequence += 1
+    this.transcriptBuffer.push({
+      sequence: this.transcriptSequence,
+      occurred_at: new Date().toISOString(),
+      ...segment
+    })
   }
 
   private sessionLog(bindings: Record<string, unknown>, kind: string): void {

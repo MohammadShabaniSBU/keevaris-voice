@@ -5,6 +5,7 @@ export type EventLogOn =
   | 'delegation'
   | 'bridgeConfig'
   | 'sessionLifecycle'
+  | 'transcript'
 
 export interface EventLogEntry {
   t: number
