@@ -45,6 +45,8 @@
     { "at": 400, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } }
   ],
   "expect": [
+    { "on": "delegation", "kind": "ask", "turnId": "sess_fixture:1:0" },
+    { "on": "delegation", "kind": "ask", "turnId": "sess_fixture:1:1" },
     { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "content": "We have 10 by 10 units available.\nI am transferring you to the front desk." },
     { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse", "functionCallId": "fc_1" },
     { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse", "functionCallId": "fc_2" },

@@ -62,6 +62,7 @@ export class VoiceSession {
   private readonly upcomingSpeech: Array<SpokenKind> = []
   private transferDispatched = false
   private lastCallerUtterance: string | undefined
+  private turnSequence = 0
   /**
    * Set only by `transport.onClose`. `'error'` as a close reason is
    * ambiguous — both a dead Twilio socket and a dead Deepgram socket
@@ -162,6 +163,7 @@ export class VoiceSession {
   private async handleFunctionCalls(calls: Array<FunctionCall>): Promise<void> {
     const { transport, agent, keevaris } = this.deps
     const sessionId = transport.sessionId
+    const turnId = this.mintTurnId()
 
     const parsed = calls.map((call) => {
       let args: AskKeevarisArguments = {}
@@ -182,7 +184,7 @@ export class VoiceSession {
     }
 
     const results = await Promise.all(
-      parsed.map(async (entry) => {
+      parsed.map(async (entry, index) => {
         if (entry.query === '') {
           return {
             call: entry.call,
@@ -194,7 +196,7 @@ export class VoiceSession {
 
         const result = await keevaris.ask({
           query: entry.query,
-          turn_id: entry.call.id,
+          turn_id: `${turnId}:${index}`,
           session_id: sessionId,
           caller_number: transport.callerNumber,
           caller_utterance: this.lastCallerUtterance ?? null
@@ -227,6 +229,11 @@ export class VoiceSession {
     }
 
     this.armTransferIfRequested(results)
+  }
+
+  private mintTurnId(): string {
+    this.turnSequence += 1
+    return `${this.deps.transport.sessionId}:${this.turnSequence}`
   }
 
   private armTransferIfRequested(results: Array<Pick<DelegationResponse, 'transfer' | 'destination'>>): void {
