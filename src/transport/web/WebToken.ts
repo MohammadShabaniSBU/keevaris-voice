@@ -1,8 +1,15 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
 
+/**
+ * Signed claims for `/web/media`. The caller decides which number/site a
+ * token is for. `/dev/token` currently mints against the first
+ * `VOICE_BRIDGE_NUMBERS` entry — that is a temporary placeholder until V08
+ * wires a real per-number mint, not a considered default.
+ */
 export interface WebTokenClaims {
   sessionId: string
   purpose: string
+  phoneNumber: string
   expiresAt: number
 }
 
@@ -36,11 +43,12 @@ export class WebTokenService {
     private readonly now: () => number = Date.now
   ) {}
 
-  mint(purpose: string, ttlMs: number): MintedWebToken {
+  mint(purpose: string, ttlMs: number, phoneNumber: string): MintedWebToken {
     const expiresAt = this.now() + ttlMs
     const claims: WebTokenClaims = {
       sessionId: randomUUID(),
       purpose,
+      phoneNumber,
       expiresAt
     }
     const payload = base64UrlEncode(JSON.stringify(claims))
@@ -91,6 +99,7 @@ export class WebTokenService {
     if (
       typeof claims.sessionId !== 'string' ||
       typeof claims.purpose !== 'string' ||
+      typeof claims.phoneNumber !== 'string' ||
       typeof claims.expiresAt !== 'number'
     ) {
       return null

@@ -2,6 +2,8 @@ export interface CallRegistryEntry {
   callSid: string
   from: string
   to: string
+  bridgeToken: string
+  bridgeSecret: string
   createdAt: number
 }
 

@@ -103,6 +103,7 @@ export async function runFixture(fixture: CallFixture, t: TestContext): Promise<
     vendor: fixture.vendor,
     sessionId: fixture.sessionId,
     callerNumber: fixture.callerNumber,
+    bridgeCredentials: fixture.bridgeCredentials,
     audioInput: fixture.audio.input,
     audioOutput: fixture.audio.output
   })

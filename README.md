@@ -56,7 +56,7 @@ Web mic ──────┘              │          │           └── 
 
 ```bash
 cp .env.example .env
-# fill in DEEPGRAM_API_KEY, KEEVARIS_BRIDGE_TOKEN, KEEVARIS_BRIDGE_SECRET
+# fill in DEEPGRAM_API_KEY and VOICE_BRIDGE_NUMBERS
 pnpm install
 pnpm dev
 ```

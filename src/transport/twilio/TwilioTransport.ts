@@ -1,6 +1,6 @@
 import type { IncomingMessage } from 'node:http'
 import twilioSdk from 'twilio'
-import { config } from '../../config.js'
+import { config, type BridgeCredentials } from '../../config.js'
 import { ConnectionRejectedError } from '../../errors.js'
 import { logger } from '../../logger.js'
 import type { RawSocket } from '../RawSocket.js'
@@ -30,6 +30,7 @@ export class TwilioTransport implements Transport {
 
   private _sessionId = ''
   private _callerNumber: string | null = null
+  private _bridgeCredentials: BridgeCredentials = { bridgeToken: '', bridgeSecret: '' }
   private streamSid = ''
   private readonly audioHandlers: Array<(chunk: Buffer) => void> = []
   private readonly closeHandlers: Array<(reason: TransportCloseReason) => void> = []
@@ -62,6 +63,10 @@ export class TwilioTransport implements Transport {
 
   get callerNumber(): string | null {
     return this._callerNumber
+  }
+
+  get bridgeCredentials(): BridgeCredentials {
+    return this._bridgeCredentials
   }
 
   /** Resolves once the `start` event has populated sessionId/callerNumber. */
@@ -159,6 +164,10 @@ export class TwilioTransport implements Transport {
         this._sessionId = start.callSid
         this.streamSid = start.streamSid
         this._callerNumber = entry.from
+        this._bridgeCredentials = {
+          bridgeToken: entry.bridgeToken,
+          bridgeSecret: entry.bridgeSecret
+        }
         this.log.info(
           { sessionId: this._sessionId, callerNumber: this._callerNumber },
           'twilio.stream_started'

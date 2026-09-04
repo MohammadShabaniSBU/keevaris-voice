@@ -1,5 +1,51 @@
 import { z } from 'zod'
 
+export interface VoiceBridgeNumberEntry {
+  phoneNumber: string
+  bridgeToken: string
+  bridgeSecret: string
+}
+
+export interface BridgeCredentials {
+  bridgeToken: string
+  bridgeSecret: string
+}
+
+const voiceBridgeNumberEntrySchema = z.object({
+  phoneNumber: z.string().min(1),
+  bridgeToken: z.string().min(1),
+  bridgeSecret: z.string().min(1)
+})
+
+/**
+ * Parses `VOICE_BRIDGE_NUMBERS`. Exported so boot-failure cases (malformed
+ * JSON, empty array, duplicate phoneNumber) can be asserted without reloading
+ * the whole env schema.
+ */
+export function parseVoiceBridgeNumbers(raw: string): Array<VoiceBridgeNumberEntry> {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw new Error('VOICE_BRIDGE_NUMBERS must be valid JSON')
+  }
+
+  const entries = z.array(voiceBridgeNumberEntrySchema).parse(parsed)
+  if (entries.length === 0) {
+    throw new Error('VOICE_BRIDGE_NUMBERS must contain at least one entry')
+  }
+
+  const seen = new Set<string>()
+  for (const entry of entries) {
+    if (seen.has(entry.phoneNumber)) {
+      throw new Error(`VOICE_BRIDGE_NUMBERS has a duplicate phoneNumber: ${entry.phoneNumber}`)
+    }
+    seen.add(entry.phoneNumber)
+  }
+
+  return entries
+}
+
 /**
  * Every value the process needs, validated once at boot. Fail fast and loud
  * rather than discovering a missing secret mid-call.
@@ -17,8 +63,17 @@ const envSchema = z.object({
   DEEPGRAM_KEEPALIVE_INTERVAL_MS: z.coerce.number().int().positive().default(8_000),
 
   KEEVARIS_API_URL: z.string().url(),
-  KEEVARIS_BRIDGE_TOKEN: z.string().min(1, 'KEEVARIS_BRIDGE_TOKEN is required'),
-  KEEVARIS_BRIDGE_SECRET: z.string().min(1, 'KEEVARIS_BRIDGE_SECRET is required'),
+  VOICE_BRIDGE_NUMBERS: z.string().min(1, 'VOICE_BRIDGE_NUMBERS is required').transform((raw, ctx) => {
+    try {
+      return parseVoiceBridgeNumbers(raw)
+    } catch (error) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: error instanceof Error ? error.message : 'VOICE_BRIDGE_NUMBERS is invalid'
+      })
+      return z.NEVER
+    }
+  }),
   KEEVARIS_BRIDGE_TIMEOUT_MS: z.coerce.number().int().positive().default(12_000),
 
   TWILIO_ACCOUNT_SID: z.string().default(''),
@@ -67,6 +122,24 @@ function loadEnv(): Env {
 
 export const env = loadEnv()
 
+const voiceBridgeNumbers = new Map<string, BridgeCredentials>(
+  env.VOICE_BRIDGE_NUMBERS.map((entry) => [
+    entry.phoneNumber,
+    { bridgeToken: entry.bridgeToken, bridgeSecret: entry.bridgeSecret }
+  ])
+)
+
+export function resolveBridgeCredentials(phoneNumber: string): BridgeCredentials | undefined {
+  return voiceBridgeNumbers.get(phoneNumber)
+}
+
+/**
+ * First entry in VOICE_BRIDGE_NUMBERS. Safe: parseVoiceBridgeNumbers rejects
+ * an empty array at boot. /dev/token uses this until V08 wires a real
+ * per-number mint — a placeholder, not a considered default.
+ */
+export const defaultVoiceBridgePhoneNumber = env.VOICE_BRIDGE_NUMBERS[0]!.phoneNumber
+
 export const config = {
   port: env.PORT,
   publicBaseUrl: env.PUBLIC_BASE_URL,
@@ -83,10 +156,10 @@ export const config = {
 
   keevaris: {
     apiUrl: env.KEEVARIS_API_URL,
-    bridgeToken: env.KEEVARIS_BRIDGE_TOKEN,
-    bridgeSecret: env.KEEVARIS_BRIDGE_SECRET,
     timeoutMs: env.KEEVARIS_BRIDGE_TIMEOUT_MS
   },
+
+  voiceBridgeNumbers,
 
   twilio: {
     accountSid: env.TWILIO_ACCOUNT_SID,

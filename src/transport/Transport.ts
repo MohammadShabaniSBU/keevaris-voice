@@ -1,3 +1,5 @@
+import type { BridgeCredentials } from '../config.js'
+
 /**
  * Audio format a transport speaks. Drives the Deepgram `Settings.audio`
  * block so nothing gets resampled in between.
@@ -27,6 +29,8 @@ export interface Transport {
   /** Becomes `voice_sessions.bridge_session_id` on the Laravel side. */
   readonly sessionId: string
   readonly callerNumber: string | null
+  /** Resolved per inbound number (Twilio) or token claim (web). Never global config. */
+  readonly bridgeCredentials: BridgeCredentials
   /** Twilio is symmetric (mulaw 8k both ways); web is not (16k in, 24k out). */
   readonly audioInput: AudioFormat
   readonly audioOutput: AudioFormat

@@ -1,3 +1,4 @@
+import type { BridgeCredentials } from '../../src/config.js'
 import type { AudioFormat, Transport, TransportCloseReason } from '../../src/transport/Transport.js'
 import type { EventLog } from './EventLog.js'
 
@@ -5,6 +6,7 @@ export interface FakeTransportOptions {
   vendor: string
   sessionId: string
   callerNumber: string | null
+  bridgeCredentials: BridgeCredentials
   audioInput: AudioFormat
   audioOutput: AudioFormat
 }
@@ -17,6 +19,7 @@ export class FakeTransport implements Transport {
   readonly vendor: string
   readonly sessionId: string
   readonly callerNumber: string | null
+  readonly bridgeCredentials: BridgeCredentials
   readonly audioInput: AudioFormat
   readonly audioOutput: AudioFormat
 
@@ -31,6 +34,7 @@ export class FakeTransport implements Transport {
     this.vendor = options.vendor
     this.sessionId = options.sessionId
     this.callerNumber = options.callerNumber
+    this.bridgeCredentials = options.bridgeCredentials
     this.audioInput = options.audioInput
     this.audioOutput = options.audioOutput
   }

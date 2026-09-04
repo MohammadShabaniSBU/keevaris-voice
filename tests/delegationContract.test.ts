@@ -28,6 +28,11 @@ const request = {
   caller_utterance: 'what are your hours, like, today?'
 }
 
+const TEST_CREDENTIALS = {
+  bridgeToken: 'test-bridge-token',
+  bridgeSecret: 'test-bridge-secret'
+}
+
 const originalFetch = globalThis.fetch
 
 afterEach(() => {
@@ -50,12 +55,12 @@ function fallbackEngagedCalls(errorMock: { mock: { calls: Array<{ arguments: Arr
 
 test('well-formed backend response is returned as-is', async () => {
   mockFetch(async (url, init) => {
-    assert.equal(String(url), `${config.keevaris.apiUrl}/api/voice/bridge/${config.keevaris.bridgeToken}`)
+    assert.equal(String(url), `${config.keevaris.apiUrl}/api/voice/bridge/${TEST_CREDENTIALS.bridgeToken}`)
     assert.equal(init?.method, 'POST')
     const headers = new Headers(init?.headers)
     assert.equal(headers.get('Content-Type'), 'application/json')
     assert.equal(headers.get('Accept'), 'application/json')
-    assert.equal(headers.get('X-Voice-Bridge-Secret'), config.keevaris.bridgeSecret)
+    assert.equal(headers.get('X-Voice-Bridge-Secret'), TEST_CREDENTIALS.bridgeSecret)
     const body = requestSchema.parse(JSON.parse(String(init?.body)))
     assert.deepEqual(body, request)
 
@@ -65,7 +70,7 @@ test('well-formed backend response is returned as-is', async () => {
     })
   })
 
-  const result = await new KeevarisClient().ask(request)
+  const result = await new KeevarisClient(TEST_CREDENTIALS).ask(request)
   assert.deepEqual(result, { text: 'We close at 6.', transfer: false, destination: undefined })
 })
 
@@ -78,7 +83,7 @@ test('response missing text falls back', async (t) => {
     })
   })
 
-  const result = await new KeevarisClient().ask(request)
+  const result = await new KeevarisClient(TEST_CREDENTIALS).ask(request)
   assert.deepEqual(result, { ...FALLBACK })
   assert.equal(fallbackEngagedCalls(errorMock), 1)
 })
@@ -89,7 +94,7 @@ test('non-2xx status falls back', async (t) => {
     return new Response('nope', { status: 503 })
   })
 
-  const result = await new KeevarisClient().ask(request)
+  const result = await new KeevarisClient(TEST_CREDENTIALS).ask(request)
   assert.deepEqual(result, { ...FALLBACK })
   assert.equal(fallbackEngagedCalls(errorMock), 1)
 })
@@ -108,10 +113,31 @@ test('AbortController timeout falls back', async (t) => {
     })
   })
 
-  const pending = new KeevarisClient().ask(request)
+  const pending = new KeevarisClient(TEST_CREDENTIALS).ask(request)
   t.mock.timers.tick(config.keevaris.timeoutMs)
   await drain()
   const result = await pending
   assert.deepEqual(result, { ...FALLBACK })
   assert.equal(fallbackEngagedCalls(errorMock), 1)
+})
+
+test('two clients in one run send two different credentials', async () => {
+  const seen: Array<{ url: string; secret: string | null }> = []
+  mockFetch(async (url, init) => {
+    const headers = new Headers(init?.headers)
+    seen.push({ url: String(url), secret: headers.get('X-Voice-Bridge-Secret') })
+
+    return new Response(JSON.stringify({ text: 'ok', transfer: false }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  })
+
+  await new KeevarisClient({ bridgeToken: 'tok_a', bridgeSecret: 'sec_a' }).ask(request)
+  await new KeevarisClient({ bridgeToken: 'tok_b', bridgeSecret: 'sec_b' }).ask(request)
+
+  assert.deepEqual(seen, [
+    { url: `${config.keevaris.apiUrl}/api/voice/bridge/tok_a`, secret: 'sec_a' },
+    { url: `${config.keevaris.apiUrl}/api/voice/bridge/tok_b`, secret: 'sec_b' }
+  ])
 })

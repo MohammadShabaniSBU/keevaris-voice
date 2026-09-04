@@ -6,6 +6,10 @@ import { WebTokenService } from '../../../src/transport/web/WebToken.js'
 import { FakeRawSocket } from '../../support/FakeRawSocket.js'
 
 const SECRET = 'test-web-token-secret'
+const TEST_CREDENTIALS = {
+  bridgeToken: 'test-bridge-token',
+  bridgeSecret: 'test-bridge-secret'
+}
 
 function buildRequest(token: string | null): import('node:http').IncomingMessage {
   const query = token === null ? '' : `?token=${encodeURIComponent(token)}`
@@ -29,7 +33,7 @@ test('createWebTransport rejects expired token', async () => {
   let now = 1_000
   const ws = new FakeRawSocket()
   const service = new WebTokenService(SECRET, () => now)
-  const minted = service.mint('dev-page', 60_000)
+  const minted = service.mint('dev-page', 60_000, '+15555550100')
 
   now = 61_001
 
@@ -38,7 +42,7 @@ test('createWebTransport rejects expired token', async () => {
 
 test('onClose registered after close fires immediately, exactly once', async () => {
   const ws = new FakeRawSocket()
-  const transport = new WebTransport(ws, 'sess_late_close')
+  const transport = new WebTransport(ws, 'sess_late_close', TEST_CREDENTIALS)
 
   ws.emitClose()
 
@@ -55,17 +59,28 @@ test('onClose registered after close fires immediately, exactly once', async () 
 test('createWebTransport accepts valid token and uses sessionId from claims', async () => {
   const ws = new FakeRawSocket()
   const service = new WebTokenService(SECRET)
-  const minted = service.mint('dev-page', 60_000)
+  const minted = service.mint('dev-page', 60_000, '+15555550100')
 
   const transport = await createWebTransport(ws, buildRequest(minted.token), service)
 
   assert.equal(transport.sessionId, minted.sessionId)
   assert.equal(transport.callerNumber, null)
+  assert.deepEqual(transport.bridgeCredentials, TEST_CREDENTIALS)
+})
+
+test('createWebTransport rejects unresolvable phoneNumber', async () => {
+  const ws = new FakeRawSocket()
+  const service = new WebTokenService(SECRET)
+  const minted = service.mint('dev-page', 60_000, '+15555550999')
+
+  await assert.rejects(createWebTransport(ws, buildRequest(minted.token), service), ConnectionRejectedError)
+  assert.equal(ws.closeCalls.length, 1)
+  assert.equal(ws.closeCalls[0]?.code, 1008)
 })
 
 test('clearAudio sends a JSON clear text frame', () => {
   const ws = new FakeRawSocket()
-  const transport = new WebTransport(ws, 'sess_clear')
+  const transport = new WebTransport(ws, 'sess_clear', TEST_CREDENTIALS)
 
   transport.clearAudio()
 

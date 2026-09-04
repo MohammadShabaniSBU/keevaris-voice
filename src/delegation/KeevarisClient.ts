@@ -1,4 +1,4 @@
-import { config } from '../config.js'
+import { config, type BridgeCredentials } from '../config.js'
 import { logger } from '../logger.js'
 import type { DelegationClient, DelegationRequest, DelegationResponse } from './types.js'
 
@@ -10,28 +10,33 @@ import type { DelegationClient, DelegationRequest, DelegationResponse } from './
  */
 const FALLBACK_HANDOFF_TEXT = 'Let me put you through to someone who can help.'
 
-function bridgeUrl(): string {
-  return new URL(`/api/voice/bridge/${config.keevaris.bridgeToken}`, config.keevaris.apiUrl).toString()
-}
-
 /**
  * One question, one answer. Always speaks the flat HTTP contract that
  * VoiceBridgeWireFormat::parse() auto-detects (no `jsonrpc` key) — this
  * service owns session_id/caller_number reliably, so there is no reason to
  * use the A2A envelope that exists only to work around Vocal Bridge.
+ *
+ * Credentials are per-call (resolved from the inbound number), not the
+ * process-wide config. apiUrl and timeoutMs stay deployment-wide.
  */
 export class KeevarisClient implements DelegationClient {
+  constructor(private readonly credentials: BridgeCredentials) {}
+
+  private bridgeUrl(): string {
+    return new URL(`/api/voice/bridge/${this.credentials.bridgeToken}`, config.keevaris.apiUrl).toString()
+  }
+
   async ask(request: DelegationRequest): Promise<DelegationResponse> {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), config.keevaris.timeoutMs)
 
     try {
-      const response = await fetch(bridgeUrl(), {
+      const response = await fetch(this.bridgeUrl(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
-          'X-Voice-Bridge-Secret': config.keevaris.bridgeSecret
+          'X-Voice-Bridge-Secret': this.credentials.bridgeSecret
         },
         body: JSON.stringify(request),
         signal: controller.signal

@@ -8,6 +8,8 @@ test('put/take round trip returns stored entry', () => {
     callSid: 'CA123',
     from: '+15555550100',
     to: '+15555550999',
+    bridgeToken: 'test-bridge-token',
+    bridgeSecret: 'test-bridge-secret',
     createdAt: 1_000
   }
 
@@ -24,6 +26,8 @@ test('take is single-use', () => {
       callSid: 'CA123',
       from: '+15555550100',
       to: '+15555550999',
+      bridgeToken: 'test-bridge-token',
+      bridgeSecret: 'test-bridge-secret',
       createdAt: 1_000
     },
     60_000
@@ -42,6 +46,8 @@ test('take returns undefined for expired nonce', () => {
       callSid: 'CA123',
       from: '+15555550100',
       to: '+15555550999',
+      bridgeToken: 'test-bridge-token',
+      bridgeSecret: 'test-bridge-secret',
       createdAt: 1_000
     },
     60_000

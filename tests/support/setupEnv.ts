@@ -12,8 +12,14 @@ process.env.LOG_LEVEL ??= 'silent'
 process.env.PUBLIC_BASE_URL ??= 'http://localhost:8787'
 process.env.DEEPGRAM_API_KEY ??= 'test-deepgram-key'
 process.env.KEEVARIS_API_URL ??= 'http://localhost:8000'
-process.env.KEEVARIS_BRIDGE_TOKEN ??= 'test-bridge-token'
-process.env.KEEVARIS_BRIDGE_SECRET ??= 'test-bridge-secret'
+process.env.VOICE_BRIDGE_NUMBERS ??= JSON.stringify([
+  {
+    phoneNumber: '+15555550100',
+    bridgeToken: 'test-bridge-token',
+    bridgeSecret: 'test-bridge-secret'
+  }
+])
+process.env.TWILIO_VALIDATE_SIGNATURE ??= 'false'
 process.env.TRANSFER_MAIN_LINE_NUMBER ??= '+15550001000'
 process.env.TRANSFER_VOICEMAIL_NUMBER ??= '+15550002000'
 process.env.COMPANY_NAME ??= 'Keevaris'

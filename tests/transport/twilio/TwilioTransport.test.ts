@@ -50,6 +50,8 @@ test('replayed nonce rejects second start frame', async () => {
       callSid: 'CA123',
       from: '+15555550100',
       to: '+15555550999',
+      bridgeToken: 'test-bridge-token',
+      bridgeSecret: 'test-bridge-secret',
       createdAt: 1_000
     },
     60_000
@@ -80,6 +82,8 @@ test('CallSid mismatch rejects valid nonce', async () => {
       callSid: 'CA123',
       from: '+15555550100',
       to: '+15555550999',
+      bridgeToken: 'test-bridge-token',
+      bridgeSecret: 'test-bridge-secret',
       createdAt: 1_000
     },
     60_000
@@ -122,6 +126,8 @@ test('valid nonce resolves callerNumber from registry', async () => {
       callSid: 'CA123',
       from: '+15555550100',
       to: '+15555550999',
+      bridgeToken: 'test-bridge-token',
+      bridgeSecret: 'test-bridge-secret',
       createdAt: 1_000
     },
     60_000
@@ -134,6 +140,10 @@ test('valid nonce resolves callerNumber from registry', async () => {
 
   assert.equal(transport.sessionId, 'CA123')
   assert.equal(transport.callerNumber, '+15555550100')
+  assert.deepEqual(transport.bridgeCredentials, {
+    bridgeToken: 'test-bridge-token',
+    bridgeSecret: 'test-bridge-secret'
+  })
 })
 
 test('clearAudio sends a Twilio clear event with the streamSid', async () => {
@@ -145,6 +155,8 @@ test('clearAudio sends a Twilio clear event with the streamSid', async () => {
       callSid: 'CA123',
       from: '+15555550100',
       to: '+15555550999',
+      bridgeToken: 'test-bridge-token',
+      bridgeSecret: 'test-bridge-secret',
       createdAt: 1_000
     },
     60_000

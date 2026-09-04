@@ -1,4 +1,5 @@
 import type { IncomingMessage } from 'node:http'
+import { resolveBridgeCredentials, type BridgeCredentials } from '../../config.js'
 import { ConnectionRejectedError } from '../../errors.js'
 import { logger } from '../../logger.js'
 import type { RawSocket } from '../RawSocket.js'
@@ -26,6 +27,7 @@ export class WebTransport implements Transport {
   readonly audioOutput = AUDIO_OUTPUT
   readonly sessionId: string
   readonly callerNumber: string | null = null
+  readonly bridgeCredentials: BridgeCredentials
 
   private readonly audioHandlers: Array<(chunk: Buffer) => void> = []
   private readonly closeHandlers: Array<(reason: TransportCloseReason) => void> = []
@@ -34,8 +36,10 @@ export class WebTransport implements Transport {
 
   constructor(
     private readonly ws: RawSocket,
-    sessionId: string
+    sessionId: string,
+    bridgeCredentials: BridgeCredentials
   ) {
+    this.bridgeCredentials = bridgeCredentials
     this.sessionId = sessionId
     this.log = logger.child({ component: 'web-transport', sessionId: this.sessionId })
 
@@ -115,5 +119,15 @@ export async function createWebTransport(
     throw new ConnectionRejectedError('invalid or expired token')
   }
 
-  return new WebTransport(ws, claims.sessionId)
+  const credentials = resolveBridgeCredentials(claims.phoneNumber)
+  if (credentials === undefined) {
+    logger.warn(
+      { sourceAddress: request.socket?.remoteAddress, phoneNumber: claims.phoneNumber },
+      'web.unknown_number'
+    )
+    ws.close(1008, 'policy violation')
+    throw new ConnectionRejectedError('unknown phone number')
+  }
+
+  return new WebTransport(ws, claims.sessionId, credentials)
 }

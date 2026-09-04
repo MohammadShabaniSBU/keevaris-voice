@@ -9,6 +9,7 @@ export const logger = pino({
   redact: {
     paths: [
       'KEEVARIS_BRIDGE_SECRET',
+      'VOICE_BRIDGE_NUMBERS',
       'apiKey',
       'authToken',
       'bridgeSecret',

@@ -71,11 +71,22 @@ const delegationResponseSchema = z.object({
   destination: z.string().optional()
 })
 
+const defaultBridgeCredentials = {
+  bridgeToken: 'test-bridge-token',
+  bridgeSecret: 'test-bridge-secret'
+}
+
 export const fixtureSchema = z.object({
   name: z.string(),
   vendor: z.enum(['twilio', 'web']).default('twilio'),
   callerNumber: z.string().nullable().default('+15555550100'),
   sessionId: z.string().default('sess_fixture'),
+  bridgeCredentials: z
+    .object({
+      bridgeToken: z.string(),
+      bridgeSecret: z.string()
+    })
+    .default(defaultBridgeCredentials),
   audio: z
     .object({
       input: audioFormatSchema,
