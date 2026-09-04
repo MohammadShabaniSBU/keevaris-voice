@@ -44,6 +44,7 @@
   ],
   "count": [
     { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "exactly": 2 },
-    { "on": "transport", "kind": "transfer", "exactly": 0 }
+    { "on": "transport", "kind": "transfer", "exactly": 0 },
+    { "on": "session", "kind": "session.delegation_result", "clientFallback": false, "exactly": 1 }
   ]
 }

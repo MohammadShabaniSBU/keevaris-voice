@@ -96,7 +96,7 @@ export async function runFixture(fixture: CallFixture, t: TestContext): Promise<
 
   const log = new EventLog()
   attachSessionLogSink((entry) => {
-    log.push({ on: 'session', kind: entry.kind })
+    log.push({ on: 'session', ...entry })
   })
 
   const transport = new FakeTransport(log, {

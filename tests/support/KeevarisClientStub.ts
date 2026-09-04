@@ -18,8 +18,9 @@ const DEFAULT_RESPONSE: DelegationResponse = {
 }
 
 /**
- * Implements DelegationClient only — does not inherit KeevarisClient, so it
- * cannot pick up the retry / hours-aware fallback V02-03 will add there.
+ * Implements DelegationClient only — does not inherit KeevarisClient.
+ * `reject: true` resolves with the same tagged fallback shape
+ * KeevarisClient.fallback() returns; the real client never throws.
  */
 export class KeevarisClientStub implements DelegationClient {
   private nextResponseIndex = 0
@@ -39,7 +40,12 @@ export class KeevarisClientStub implements DelegationClient {
     })
 
     if (this.config.reject === true) {
-      return Promise.reject(new Error('delegation stub rejected'))
+      return Promise.resolve({
+        text: 'Let me put you through to someone who can help.',
+        transfer: true,
+        destination: 'main_line',
+        clientFallback: true
+      })
     }
 
     const response = this.nextResponse()

@@ -29,7 +29,8 @@ export const logMatcherSchema = z.object({
   reason: z.string().optional(),
   destinationNumber: z.string().optional(),
   callerUtterance: z.string().nullable().optional(),
-  turnId: z.string().optional()
+  turnId: z.string().optional(),
+  clientFallback: z.boolean().optional()
 })
 
 const contentGuardSchema = z.object({

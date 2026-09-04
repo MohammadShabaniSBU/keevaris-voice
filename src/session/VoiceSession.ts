@@ -38,7 +38,7 @@ type SpeechKind = 'nothing' | 'greeting' | 'filler' | 'answer'
 type SpokenKind = Exclude<SpeechKind, 'nothing'>
 type TransferTrigger = 'answer_done' | 'deadline' | 'teardown'
 
-type SessionLogSink = (entry: { kind: string }) => void
+type SessionLogSink = (entry: { kind: string } & Record<string, unknown>) => void
 
 let sessionLogSink: SessionLogSink | undefined
 
@@ -202,8 +202,14 @@ export class VoiceSession {
           caller_utterance: this.lastCallerUtterance ?? null
         })
 
-        this.log.info(
-          { sessionId, id: entry.call.id, transfer: result.transfer, destination: result.destination },
+        this.sessionLog(
+          {
+            sessionId,
+            id: entry.call.id,
+            transfer: result.transfer,
+            destination: result.destination,
+            clientFallback: result.clientFallback === true
+          },
           'session.delegation_result'
         )
 
@@ -376,6 +382,6 @@ export class VoiceSession {
 
   private sessionLog(bindings: Record<string, unknown>, kind: string): void {
     this.log.info(bindings, kind)
-    sessionLogSink?.({ kind })
+    sessionLogSink?.({ kind, ...bindings })
   }
 }

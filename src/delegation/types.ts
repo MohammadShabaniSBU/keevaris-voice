@@ -18,6 +18,10 @@ export interface DelegationResponse {
   text: string
   transfer: boolean
   destination?: string
+  /** Set only by KeevarisClient.fallback() — never present in a real
+   *  backend response. Distinguishes "our client gave up" from a
+   *  legitimate backend-directed transfer. */
+  clientFallback?: true
 }
 
 export interface DelegationClient {

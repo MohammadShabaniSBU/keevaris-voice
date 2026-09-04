@@ -3,11 +3,13 @@ import { afterEach, test } from 'node:test'
 import { z } from 'zod'
 import { KeevarisClient } from '../src/delegation/KeevarisClient.js'
 import { config } from '../src/config.js'
+import { logger } from '../src/logger.js'
 
 const FALLBACK = {
   text: 'Let me put you through to someone who can help.',
   transfer: true,
-  destination: 'main_line'
+  destination: 'main_line',
+  clientFallback: true
 } as const
 
 const requestSchema = z.object({
@@ -42,6 +44,10 @@ function drain(): Promise<void> {
   })
 }
 
+function fallbackEngagedCalls(errorMock: { mock: { calls: Array<{ arguments: Array<unknown> }> } }): number {
+  return errorMock.mock.calls.filter((call) => call.arguments[1] === 'delegation.fallback_engaged').length
+}
+
 test('well-formed backend response is returned as-is', async () => {
   mockFetch(async (url, init) => {
     assert.equal(String(url), `${config.keevaris.apiUrl}/api/voice/bridge/${config.keevaris.bridgeToken}`)
@@ -63,7 +69,8 @@ test('well-formed backend response is returned as-is', async () => {
   assert.deepEqual(result, { text: 'We close at 6.', transfer: false, destination: undefined })
 })
 
-test('response missing text falls back', async () => {
+test('response missing text falls back', async (t) => {
+  const errorMock = t.mock.method(logger, 'error')
   mockFetch(async () => {
     return new Response(JSON.stringify({ transfer: true, destination: 'main_line' }), {
       status: 200,
@@ -73,19 +80,23 @@ test('response missing text falls back', async () => {
 
   const result = await new KeevarisClient().ask(request)
   assert.deepEqual(result, { ...FALLBACK })
+  assert.equal(fallbackEngagedCalls(errorMock), 1)
 })
 
-test('non-2xx status falls back', async () => {
+test('non-2xx status falls back', async (t) => {
+  const errorMock = t.mock.method(logger, 'error')
   mockFetch(async () => {
     return new Response('nope', { status: 503 })
   })
 
   const result = await new KeevarisClient().ask(request)
   assert.deepEqual(result, { ...FALLBACK })
+  assert.equal(fallbackEngagedCalls(errorMock), 1)
 })
 
 test('AbortController timeout falls back', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'] })
+  const errorMock = t.mock.method(logger, 'error')
 
   mockFetch(async (_url, init) => {
     return new Promise<Response>((_resolve, reject) => {
@@ -102,4 +113,5 @@ test('AbortController timeout falls back', async (t) => {
   await drain()
   const result = await pending
   assert.deepEqual(result, { ...FALLBACK })
+  assert.equal(fallbackEngagedCalls(errorMock), 1)
 })

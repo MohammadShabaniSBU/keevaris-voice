@@ -43,14 +43,14 @@ export class KeevarisClient implements DelegationClient {
           'delegation.http_error'
         )
 
-        return this.fallback()
+        return this.fallback(request.session_id, request.turn_id)
       }
 
       const body = (await response.json()) as Partial<DelegationResponse>
       if (typeof body.text !== 'string') {
         logger.error({ sessionId: request.session_id, turnId: request.turn_id }, 'delegation.malformed_response')
 
-        return this.fallback()
+        return this.fallback(request.session_id, request.turn_id)
       }
 
       return {
@@ -64,13 +64,14 @@ export class KeevarisClient implements DelegationClient {
         'delegation.request_failed'
       )
 
-      return this.fallback()
+      return this.fallback(request.session_id, request.turn_id)
     } finally {
       clearTimeout(timeout)
     }
   }
 
-  private fallback(): DelegationResponse {
-    return { text: FALLBACK_HANDOFF_TEXT, transfer: true, destination: 'main_line' }
+  private fallback(sessionId: string, turnId: string): DelegationResponse {
+    logger.error({ sessionId, turnId }, 'delegation.fallback_engaged')
+    return { text: FALLBACK_HANDOFF_TEXT, transfer: true, destination: 'main_line', clientFallback: true }
   }
 }
