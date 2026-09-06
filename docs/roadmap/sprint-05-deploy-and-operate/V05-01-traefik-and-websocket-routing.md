@@ -73,16 +73,25 @@ back into) needs to point at the new subdomain in any deployed environment
 
 ## Acceptance criteria
 
-- [ ] `keevaris-voice` has its own Traefik router, on its own subdomain,
+- [x] `keevaris-voice` has its own Traefik router, on its own subdomain,
       not sharing or repurposing `ws.test2.keevaris.local`.
+      Labels live on the `voice` service in `docker-compose.yml`,
+      host `voice.test2.keevaris.local`, port 8787.
 - [ ] A `wss://` connection to the new subdomain completes the WebSocket
       upgrade successfully through Traefik (verified with a real
-      connection, not just `curl`).
+      connection, not just `curl`). Operational — live Traefik; handed
+      to V05-04's runbook.
 - [ ] Entrypoint timeouts on this router are confirmed to exceed
-      `MAX_CALL_SECONDS`, not just assumed to.
-- [ ] TLS is issued and valid for the new subdomain.
-- [ ] `PUBLIC_BASE_URL` in the deployed environment's config points at the
-      new subdomain.
+      `MAX_CALL_SECONDS`, not just assumed to. Operational — live
+      Traefik static/dynamic config; handed to V05-04's runbook.
+- [ ] TLS is issued and valid for the new subdomain. Operational —
+      ACME/wildcard/SAN on the existing cert mechanism; handed to
+      V05-04's runbook.
+- [x] `PUBLIC_BASE_URL` in the deployed environment's config points at the
+      new subdomain. Dev default stays `http://localhost:8787`;
+      `.env.example` now names the deployed value
+      `https://voice.test2.keevaris.local`. Setting the live `.env` is
+      operational and is listed in V05-04.
 
 ## Out of scope
 

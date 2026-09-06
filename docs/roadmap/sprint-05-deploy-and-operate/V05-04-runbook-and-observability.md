@@ -22,6 +22,22 @@ sprint, not generic advice:
 - **Deploy.** The actual `docker compose` commands, which subdomain to
   check afterward, how to confirm the new revision is actually serving
   (checking `/health/ready`, not just that the container started).
+  Include V05-01's operational checks — they are not encoded as a repo
+  diff and must not be silently skipped:
+  - Entrypoint read/write/idle timeouts on the entrypoint serving
+    `voice.test2.keevaris.local` exceed `MAX_CALL_SECONDS` (1800s),
+    comfortably. Confirm against Traefik's static/dynamic config, do
+    not assume defaults.
+  - No request-body-size or short-timeout middleware chain written for
+    `unit-hq-api`'s JSON routes applies to the `keevaris-voice` router.
+  - TLS covers `voice.test2.keevaris.local` the same way
+    `test2.keevaris.local` / `ws.test2.keevaris.local` are covered
+    (wildcard, or add a SAN/entry).
+  - A real `wss://` connection through Traefik completes the upgrade
+    (not `curl`).
+  - Deployed `.env` has
+    `PUBLIC_BASE_URL=https://voice.test2.keevaris.local`, never
+    `localhost`.
 - **Roll back.** How to revert to the previous image/tag given whatever
   deployment mechanism V05-00/01 actually used.
 - **Reading the p95 command.** `agents:report-voice-latency-p95 --since=...`

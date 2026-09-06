@@ -8,6 +8,12 @@ services:
       - NODE_ENV=production
     env_file:
       - .env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.keevaris-voice.rule=Host(`voice.test2.keevaris.local`)"
+      - "traefik.http.routers.keevaris-voice.service=keevaris-voice"
+      - "traefik.http.services.keevaris-voice.loadbalancer.server.port=8787"
+      - "traefik.docker.network=traefik-network"
     logging:
       driver: "json-file"
       options:
