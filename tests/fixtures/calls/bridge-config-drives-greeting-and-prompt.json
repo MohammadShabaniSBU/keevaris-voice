@@ -53,7 +53,7 @@
       "kind": "send",
       "messageType": "Settings",
       "greeting": "Soy un asistente automatizado de Almacenajes Sur.",
-      "prompt": "The opening disclosure line has already been spoken to the caller before you receive any input. Do not repeat it, and do not say anything before the caller speaks.\nAnswer in the language the caller is speaking, even if it differs from the opening line's language.\nNever invent a site name.\nAlways mention the site city when asked."
+      "prompt": "The opening disclosure line has already been spoken to the caller before you receive any input. Do not repeat it, and do not say anything before the caller speaks.\nAnswer in the language the caller is speaking, even if it differs from the opening line's language. If they ask to switch or continue in a language, switch immediately and do not call ask_keevaris.\nNever invent a site name.\nAlways mention the site city when asked."
     },
     { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "content": "Un momento, lo consulto." },
     { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "content": "Tenemos unidades disponibles." },

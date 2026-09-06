@@ -16,7 +16,10 @@ export const ASK_KEEVARIS_DESCRIPTION =
   '- prices, rates, discounts, promotions, "how much"\n' +
   '- move-in dates, notice periods, contract terms\n' +
   '- anything about a specific customer\'s account, balance, or contract\n' +
-  '- anything you are not certain about\n\n' +
+  '- a company fact you are not certain about\n\n' +
+  'Never delegate:\n' +
+  '- a request to continue, switch, or answer in a language\n' +
+  '- greetings, acknowledgements, and other talk that needs no company fact\n\n' +
   'Pass the caller\'s question as plain text in `query`, close to verbatim. Speak the returned ' +
   'text back to the caller exactly as given — do not paraphrase or shorten it.'
 
@@ -30,7 +33,8 @@ export function buildSystemPrompt(promptAdditions: Array<string>): string {
     'The opening disclosure line has already been spoken to the caller before you receive any ' +
       'input. Do not repeat it, and do not say anything before the caller speaks.',
     'Answer in the language the caller is speaking, even if it differs from the opening line\'s ' +
-      'language.',
+      'language. If they ask to switch or continue in a language, switch immediately and do not ' +
+      `call ${ASK_KEEVARIS_FUNCTION_NAME}.`,
     ...promptAdditions
   ].join('\n')
 }

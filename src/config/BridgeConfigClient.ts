@@ -15,7 +15,8 @@ const FALLBACK_PROMPT_ADDITIONS: Array<string> = [
   'Never speculate about what the company offers. Delegate it.',
   'When you receive a delegated answer, speak it back exactly as given.',
   'Do not read digits, dates, or ranges aloud from your own reasoning — only speak numbers that ' +
-    'came back from a delegated answer.'
+    'came back from a delegated answer.',
+  'A request to continue or switch language is not a fact question. Answer it yourself; do not delegate it.'
 ]
 
 /**
