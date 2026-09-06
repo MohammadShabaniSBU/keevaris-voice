@@ -47,7 +47,9 @@ export const logMatcherSchema = z.object({
   clientFallback: z.boolean().optional(),
   role: z.string().optional(),
   source: z.string().optional(),
-  sequence: z.number().optional()
+  sequence: z.number().optional(),
+  fillerSpoken: z.boolean().optional(),
+  roundTripMs: z.number().optional()
 })
 
 const contentGuardSchema = z.object({

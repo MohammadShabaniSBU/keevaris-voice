@@ -61,6 +61,8 @@ export class VoiceSession {
   private readonly upcomingSpeech: Array<SpokenKind> = []
   private transferDispatched = false
   private lastCallerUtterance: string | undefined
+  private lastCallerUtteranceAt: number | undefined
+  private pendingRoundTrip: { startedAt: number; segments: Array<TranscriptSegment> } | undefined
   private turnSequence = 0
   private transcriptSequence = 0
   private readonly transcriptBuffer: Array<TranscriptSegment> = []
@@ -123,6 +125,13 @@ export class VoiceSession {
       case 'audio':
         this.resetIdleTimer()
         this.deps.transport.sendAudio(event.chunk)
+        if (this.speech === 'answer' && this.pendingRoundTrip !== undefined) {
+          const roundTripMs = Date.now() - this.pendingRoundTrip.startedAt
+          for (const segment of this.pendingRoundTrip.segments) {
+            segment.round_trip_ms = roundTripMs
+          }
+          this.pendingRoundTrip = undefined
+        }
         break
       case 'userStartedSpeaking':
         this.deps.transport.clearAudio()
@@ -130,6 +139,7 @@ export class VoiceSession {
       case 'transcript':
         if (event.role === 'user') {
           this.lastCallerUtterance = event.text
+          this.lastCallerUtteranceAt = Date.now()
         }
         this.pushTranscript({
           role: event.role === 'user' ? 'caller' : 'agent',
@@ -233,21 +243,32 @@ export class VoiceSession {
     }
 
     const answerText = results.map((result) => result.text).join('\n')
+    const delegatedSegments: Array<TranscriptSegment> = []
     for (const [index, result] of results.entries()) {
       const entry = parsed[index]
       if (entry === undefined || entry.query === '') {
         continue
       }
 
-      this.pushTranscript({
-        role: 'agent',
-        text: result.text,
-        source: 'delegated',
-        turn_id: `${turnId}:${index}`
-      })
+      delegatedSegments.push(
+        this.pushTranscript({
+          role: 'agent',
+          text: result.text,
+          source: 'delegated',
+          turn_id: `${turnId}:${index}`,
+          filler_spoken: needsDelegation
+        })
+      )
     }
     agent.injectAgentMessage(answerText)
     this.enqueueSpeech('answer')
+
+    if (this.lastCallerUtteranceAt !== undefined && delegatedSegments.length > 0) {
+      this.pendingRoundTrip = {
+        startedAt: this.lastCallerUtteranceAt,
+        segments: delegatedSegments
+      }
+    }
 
     for (const result of results) {
       agent.respondToFunctionCall(result.call.id, result.call.name, buildFunctionCallStub(result))
@@ -404,13 +425,17 @@ export class VoiceSession {
     this.clearTransferDeadline()
   }
 
-  private pushTranscript(segment: Omit<TranscriptSegment, 'sequence' | 'occurred_at'>): void {
+  private pushTranscript(segment: Omit<TranscriptSegment, 'sequence' | 'occurred_at'>): TranscriptSegment {
     this.transcriptSequence += 1
-    this.transcriptBuffer.push({
+    const row: TranscriptSegment = {
       sequence: this.transcriptSequence,
       occurred_at: new Date().toISOString(),
       ...segment
-    })
+    }
+    this.transcriptBuffer.push(row)
+    // Return the same object we just pushed, not a copy — the caller mutates
+    // this by reference once round-trip timing is known.
+    return row
   }
 
   private sessionLog(bindings: Record<string, unknown>, kind: string): void {

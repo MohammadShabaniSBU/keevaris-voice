@@ -18,6 +18,8 @@ export interface TranscriptSegment {
   source: TranscriptSource
   occurred_at: string
   turn_id?: string
+  round_trip_ms?: number
+  filler_spoken?: boolean
 }
 
 export interface TranscriptClient {

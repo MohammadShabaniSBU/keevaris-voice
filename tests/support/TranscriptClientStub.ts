@@ -33,7 +33,9 @@ export class TranscriptClientStub implements TranscriptClient {
         source: segment.source,
         content: segment.text,
         turnId: segment.turn_id,
-        sequence: segment.sequence
+        sequence: segment.sequence,
+        ...(segment.filler_spoken !== undefined ? { fillerSpoken: segment.filler_spoken } : {}),
+        ...(segment.round_trip_ms !== undefined ? { roundTripMs: segment.round_trip_ms } : {})
       })
     }
 

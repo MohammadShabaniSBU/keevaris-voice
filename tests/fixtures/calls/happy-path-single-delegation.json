@@ -1,6 +1,6 @@
 {
   "name": "happy-path-single-delegation",
-  "note": "V04-01. ConversationText + delayed ask so filler echo lands before the delegated segment. Hangup flushes the buffer.",
+  "note": "V04-01 + V04-02. ConversationText + delayed ask so filler echo lands before the delegated segment. Filler audio, then AgentAudioDone, then answer audio — round_trip_ms is caller-text (t=50) to answer-first-audio (t=350) = 300, not filler audio (t=200).",
   "delegation": {
     "delayMs": 80,
     "response": {
@@ -50,6 +50,7 @@
     },
     { "at": 200, "from": "agentSocket", "kind": "audio", "bytes": 320 },
     { "at": 300, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } },
+    { "at": 350, "from": "agentSocket", "kind": "audio", "bytes": 320 },
     { "at": 400, "from": "caller", "kind": "close", "reason": "caller_hangup" }
   ],
   "expect": [
@@ -59,7 +60,7 @@
     { "on": "transport", "kind": "sendAudio" },
     { "on": "transcript", "kind": "segment", "role": "caller", "source": "stt", "content": "what are your hours?" },
     { "on": "transcript", "kind": "segment", "role": "agent", "source": "fast_model", "content": "Let me check that for you." },
-    { "on": "transcript", "kind": "segment", "role": "agent", "source": "delegated", "content": "We are open from 8am to 6pm.", "turnId": "sess_fixture:1:0" }
+    { "on": "transcript", "kind": "segment", "role": "agent", "source": "delegated", "content": "We are open from 8am to 6pm.", "turnId": "sess_fixture:1:0", "fillerSpoken": true, "roundTripMs": 300 }
   ],
   "forbidContent": [
     {
