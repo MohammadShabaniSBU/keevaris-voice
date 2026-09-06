@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { AgentEvent } from '../../../src/agent/AgentProvider.js'
 import { DeepgramVoiceAgent } from '../../../src/agent/deepgram/DeepgramVoiceAgent.js'
+import type { DependencyHealthReporter, DependencyName } from '../../../src/server/DependencyHealth.js'
 import { EventLog } from '../../support/EventLog.js'
 import { DeepgramSocketDouble } from '../../support/DeepgramSocketDouble.js'
 
@@ -302,4 +303,71 @@ test('InjectionRefused does not emit an AgentEvent', async () => {
 
   assert.deepEqual(received, [])
   await agent.close()
+})
+
+function recordingReporter(): DependencyHealthReporter & { reports: Array<{ name: DependencyName; ok: boolean }> } {
+  const reports: Array<{ name: DependencyName; ok: boolean }> = []
+  return {
+    reports,
+    report(name, ok) {
+      reports.push({ name, ok })
+    }
+  }
+}
+
+test('start reports deepgram healthy after SettingsApplied', async () => {
+  const log = new EventLog()
+  let socket: DeepgramSocketDouble | undefined
+  const reporter = recordingReporter()
+
+  const agent = new DeepgramVoiceAgent(
+    'sess_health_ok',
+    AGENT_OPTIONS,
+    () => {
+      socket = new DeepgramSocketDouble(log)
+      return socket
+    },
+    reporter
+  )
+
+  const startPromise = agent.start(AUDIO, AUDIO)
+  startPromise.catch(() => {})
+  await drain()
+
+  assert.ok(socket)
+  socket.simulateOpen()
+  socket.sendControl({ type: 'SettingsApplied' })
+  await drain()
+  await startPromise
+
+  assert.deepEqual(reporter.reports, [{ name: 'deepgram', ok: true }])
+  await agent.close()
+})
+
+test('start reports deepgram down when the socket closes before SettingsApplied', async () => {
+  const log = new EventLog()
+  let socket: DeepgramSocketDouble | undefined
+  const reporter = recordingReporter()
+
+  const agent = new DeepgramVoiceAgent(
+    'sess_health_down',
+    AGENT_OPTIONS,
+    () => {
+      socket = new DeepgramSocketDouble(log)
+      return socket
+    },
+    reporter
+  )
+
+  const startPromise = agent.start(AUDIO, AUDIO)
+  startPromise.catch(() => {})
+  await drain()
+
+  assert.ok(socket)
+  socket.simulateOpen()
+  socket.simulateClose(1000, 'gone')
+  await drain()
+  await assert.rejects(startPromise)
+
+  assert.deepEqual(reporter.reports, [{ name: 'deepgram', ok: false }])
 })

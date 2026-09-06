@@ -22,3 +22,23 @@ test('release frees a slot', () => {
   assert.equal(gate.tryAcquire(), true)
   assert.equal(gate.activeCount, 1)
 })
+
+test('registerSession and unregisterSession track active sessions', () => {
+  const gate = new ConnectionGate(2)
+  const first = { teardown: async () => {} }
+  const second = { teardown: async () => {} }
+
+  gate.registerSession(first)
+  gate.registerSession(second)
+  assert.equal(gate.activeSessions.size, 2)
+  assert.equal(gate.activeSessions.has(first), true)
+  assert.equal(gate.activeSessions.has(second), true)
+
+  gate.unregisterSession(first)
+  assert.equal(gate.activeSessions.size, 1)
+  assert.equal(gate.activeSessions.has(first), false)
+  assert.equal(gate.activeSessions.has(second), true)
+
+  gate.unregisterSession(first)
+  assert.equal(gate.activeSessions.size, 1)
+})

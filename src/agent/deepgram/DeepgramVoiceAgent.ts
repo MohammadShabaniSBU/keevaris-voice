@@ -1,6 +1,7 @@
 import { WebSocket } from 'ws'
 import { config } from '../../config.js'
 import { logger } from '../../logger.js'
+import type { DependencyHealthReporter } from '../../server/DependencyHealth.js'
 import type { AudioFormat } from '../../transport/Transport.js'
 import type { AgentEvent, AgentProvider } from '../AgentProvider.js'
 import { buildSettingsMessage } from './settings.js'
@@ -61,7 +62,8 @@ export class DeepgramVoiceAgent implements AgentProvider {
     private readonly sessionId: string,
     private readonly options: { greeting: string; promptAdditions: Array<string> },
     private readonly socketFactory: DeepgramSocketFactory = (url, options) =>
-      new WebSocket(url, options)
+      new WebSocket(url, options),
+    private readonly dependencyHealth?: DependencyHealthReporter
   ) {
     this.log = logger.child({ component: 'deepgram', sessionId })
   }
@@ -86,12 +88,14 @@ export class DeepgramVoiceAgent implements AgentProvider {
       const settleReject = (error: Error): void => {
         if (settled) return
         settled = true
+        this.dependencyHealth?.report('deepgram', false)
         reject(error)
       }
 
       const settleResolve = (): void => {
         if (settled) return
         settled = true
+        this.dependencyHealth?.report('deepgram', true)
         resolve()
       }
 

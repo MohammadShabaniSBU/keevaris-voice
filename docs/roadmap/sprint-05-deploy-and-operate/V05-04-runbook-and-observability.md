@@ -38,6 +38,13 @@ sprint, not generic advice:
   - Deployed `.env` has
     `PUBLIC_BASE_URL=https://voice.test2.keevaris.local`, never
     `localhost`.
+  - V05-03's live SIGTERM drain: `docker compose stop` (or `kill -TERM`)
+    during an active test call. Confirm `/health/ready` flips to 503
+    immediately, the in-progress call either finishes inside
+    `SHUTDOWN_GRACE_MS` or is torn down via `teardown('server_shutdown')`,
+    and an already-armed transfer still completes. The fixture only
+    proves the teardown call; a real signal to a real process is the
+    proof.
 - **Roll back.** How to revert to the previous image/tag given whatever
   deployment mechanism V05-00/01 actually used.
 - **Reading the p95 command.** `agents:report-voice-latency-p95 --since=...`

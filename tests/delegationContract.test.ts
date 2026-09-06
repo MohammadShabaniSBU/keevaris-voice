@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { KeevarisClient } from '../src/delegation/KeevarisClient.js'
 import { config } from '../src/config.js'
 import { logger } from '../src/logger.js'
+import type { DependencyHealthReporter, DependencyName } from '../src/server/DependencyHealth.js'
 
 const FALLBACK = {
   text: 'Let me put you through to someone who can help.',
@@ -140,4 +141,37 @@ test('two clients in one run send two different credentials', async () => {
     { url: `${config.keevaris.apiUrl}/api/voice/bridge/tok_a`, secret: 'sec_a' },
     { url: `${config.keevaris.apiUrl}/api/voice/bridge/tok_b`, secret: 'sec_b' }
   ])
+})
+
+function recordingReporter(): DependencyHealthReporter & { reports: Array<{ name: DependencyName; ok: boolean }> } {
+  const reports: Array<{ name: DependencyName; ok: boolean }> = []
+  return {
+    reports,
+    report(name, ok) {
+      reports.push({ name, ok })
+    }
+  }
+}
+
+test('successful ask reports keevaris healthy', async () => {
+  const reporter = recordingReporter()
+  mockFetch(async () => {
+    return new Response(JSON.stringify({ text: 'We close at 6.', transfer: false }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  })
+
+  await new KeevarisClient(TEST_CREDENTIALS, reporter).ask(request)
+  assert.deepEqual(reporter.reports, [{ name: 'keevaris', ok: true }])
+})
+
+test('fallback ask reports keevaris down', async () => {
+  const reporter = recordingReporter()
+  mockFetch(async () => {
+    return new Response('nope', { status: 503 })
+  })
+
+  await new KeevarisClient(TEST_CREDENTIALS, reporter).ask(request)
+  assert.deepEqual(reporter.reports, [{ name: 'keevaris', ok: false }])
 })

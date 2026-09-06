@@ -1,5 +1,6 @@
 import { config, type BridgeCredentials } from '../config.js'
 import { logger } from '../logger.js'
+import type { DependencyHealthReporter } from '../server/DependencyHealth.js'
 import type { DelegationClient, DelegationRequest, DelegationResponse } from './types.js'
 
 /**
@@ -20,7 +21,10 @@ const FALLBACK_HANDOFF_TEXT = 'Let me put you through to someone who can help.'
  * process-wide config. apiUrl and timeoutMs stay deployment-wide.
  */
 export class KeevarisClient implements DelegationClient {
-  constructor(private readonly credentials: BridgeCredentials) {}
+  constructor(
+    private readonly credentials: BridgeCredentials,
+    private readonly dependencyHealth?: DependencyHealthReporter
+  ) {}
 
   private bridgeUrl(): string {
     return new URL(`/api/voice/bridge/${this.credentials.bridgeToken}`, config.keevaris.apiUrl).toString()
@@ -58,6 +62,7 @@ export class KeevarisClient implements DelegationClient {
         return this.fallback(request.session_id, request.turn_id)
       }
 
+      this.dependencyHealth?.report('keevaris', true)
       return {
         text: body.text,
         transfer: body.transfer === true,
@@ -77,6 +82,7 @@ export class KeevarisClient implements DelegationClient {
 
   private fallback(sessionId: string, turnId: string): DelegationResponse {
     logger.error({ sessionId, turnId }, 'delegation.fallback_engaged')
+    this.dependencyHealth?.report('keevaris', false)
     return { text: FALLBACK_HANDOFF_TEXT, transfer: true, destination: 'main_line', clientFallback: true }
   }
 }

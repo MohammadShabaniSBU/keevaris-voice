@@ -352,7 +352,11 @@ export class VoiceSession {
     await this.teardown('transferred')
   }
 
-  private async teardown(reason: TransportCloseReason): Promise<void> {
+  /**
+   * Only path that closes transport + agent. Public so SIGTERM drain can
+   * call `teardown('server_shutdown')` directly; still idempotent.
+   */
+  async teardown(reason: TransportCloseReason): Promise<void> {
     if (this.state.status === 'closing' || this.state.status === 'closed') {
       return
     }

@@ -166,6 +166,11 @@ export async function runFixture(fixture: CallFixture, t: TestContext): Promise<
         continue
       }
 
+      if (event.from === 'shutdown') {
+        await session.teardown('server_shutdown')
+        continue
+      }
+
       if (event.from === 'caller') {
         if (event.kind === 'audio') {
           transport.pushAudio(Buffer.alloc(event.bytes ?? 160))

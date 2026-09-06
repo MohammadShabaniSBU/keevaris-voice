@@ -1,0 +1,41 @@
+{
+  "name": "server-shutdown-completes-armed-transfer",
+  "note": "V05-03. SIGTERM while a transfer is armed. teardown('server_shutdown') completes the armed transfer (session.transfer_teardown) rather than abandoning it. The call then ends as transferred — the same V01-04 teardown path, now reachable from GracefulShutdown.",
+  "delegation": {
+    "response": {
+      "text": "I am transferring you now.",
+      "transfer": true,
+      "destination": "main_line"
+    }
+  },
+  "events": [
+    { "at": 0, "from": "agentSocket", "kind": "open" },
+    { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
+    { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
+    {
+      "at": 100,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "FunctionCallRequest",
+        "functions": [
+          {
+            "id": "fc_1",
+            "name": "ask_keevaris",
+            "arguments": "{\"query\":\"I want to talk to a person\"}",
+            "client_side": true
+          }
+        ]
+      }
+    },
+    { "at": 150, "from": "shutdown", "kind": "sigterm" }
+  ],
+  "expect": [
+    { "on": "session", "kind": "session.transfer_teardown" },
+    { "on": "transport", "kind": "transfer" },
+    { "on": "sessionLifecycle", "kind": "end", "reason": "transferred" }
+  ],
+  "count": [
+    { "on": "session", "kind": "session.transfer_abandoned", "exactly": 0 }
+  ]
+}

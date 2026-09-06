@@ -84,6 +84,12 @@ const clockEventSchema = z.object({
   kind: z.literal('advance')
 })
 
+const shutdownEventSchema = z.object({
+  at: z.number().nonnegative(),
+  from: z.literal('shutdown'),
+  kind: z.literal('sigterm')
+})
+
 const delegationResponseSchema = z.object({
   text: z.string(),
   transfer: z.boolean(),
@@ -156,7 +162,12 @@ export const fixtureSchema = z.object({
     })
     .optional(),
   events: z.array(
-    z.discriminatedUnion('from', [callerEventSchema, agentSocketEventSchema, clockEventSchema])
+    z.discriminatedUnion('from', [
+      callerEventSchema,
+      agentSocketEventSchema,
+      clockEventSchema,
+      shutdownEventSchema
+    ])
   ),
   expect: z.array(logMatcherSchema),
   forbid: z.array(logMatcherSchema.extend({ before: z.number().int().nonnegative() })).default([]),

@@ -92,22 +92,30 @@ synthesizing a new one.
 
 ## Acceptance criteria
 
-- [ ] `/health/live` and `/health/ready` exist and answer different
+- [x] `/health/live` and `/health/ready` exist and answer different
       questions; `/health` aliases `/health/live`.
-- [ ] `/health/ready` returns 503 while draining, and (when a real
+- [x] `/health/ready` returns 503 while draining, and (when a real
       Deepgram/API outage can be simulated) when a recent real call
       attempt failed to reach either dependency.
-- [ ] SIGTERM stops accepting new connections immediately and flips
+      Unit-tested via `ReadinessState` / `DependencyHealth` / reporter
+      wiring; live outage observation is operational.
+- [x] SIGTERM stops accepting new connections immediately and flips
       readiness to 503.
+      `GracefulShutdown` tests cover drain + `server.close()` + forced
+      `teardown('server_shutdown')`.
 - [ ] A live call in progress when SIGTERM arrives is not abruptly
       dropped — it either completes naturally within the grace period or
       is torn down via `teardown('server_shutdown')`, including completing
       an already-armed transfer.
+      Fixture `server-shutdown-completes-armed-transfer.json` proves the
+      teardown-and-transfer half.
 - [ ] `docker compose stop` (or a manual SIGTERM) during an active test
       call is verified by hand, not just asserted in a fixture — this is
       exactly the kind of timing behavior a fixture can partially prove
       (the teardown call happens, with the right reason) but a real signal
       to a real process is the actual proof.
+      Operational — live container + credentials; handed to V05-04's
+      runbook.
 
 ## Out of scope
 

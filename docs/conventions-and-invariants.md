@@ -22,9 +22,9 @@ Fixture: `tests/fixtures/calls/barge-in-clears-playback.json` (Twilio) and `test
 
 **V3. Close is emitted exactly once and latched.** A subscriber registering after close is told immediately. `VoiceSession.teardown` is the only path that closes either socket.
 
-Enforced by: `TwilioTransport.emitClose` / `WebTransport.emitClose` (`closedReason` latch + replay in `onClose`); `DeepgramVoiceAgent.emit` (`closedEvent` latch + replay in `onEvent`); `VoiceSession.teardown` (`src/session/VoiceSession.ts`) — idempotent, the only call site of `transport.close` and `agent.close`.
+Enforced by: `TwilioTransport.emitClose` / `WebTransport.emitClose` (`closedReason` latch + replay in `onClose`); `DeepgramVoiceAgent.emit` (`closedEvent` latch + replay in `onEvent`); `VoiceSession.teardown` (`src/session/VoiceSession.ts`) — idempotent, the only call site of `transport.close` and `agent.close`. `GracefulShutdown` (`src/server/GracefulShutdown.ts`) is the first production caller of `teardown('server_shutdown')`: SIGTERM drains, then force-tears remaining sessions with that reason so an already-armed transfer still completes rather than dying under the process.
 
-Fixture: `tests/fixtures/calls/hangup-during-agent-handshake.json` (`assertTimersClearAfter: true`) — transport already closed before `VoiceSession` exists; the late `onClose` fires, `closeRequested` closes the agent socket that opens afterwards, no `Settings` frame goes out, no timer outlives the call. `tests/agent/deepgram/DeepgramVoiceAgent.test.ts` (`close during CONNECTING…`) covers the agent half alone.
+Fixture: `tests/fixtures/calls/hangup-during-agent-handshake.json` (`assertTimersClearAfter: true`) — transport already closed before `VoiceSession` exists; the late `onClose` fires, `closeRequested` closes the agent socket that opens afterwards, no `Settings` frame goes out, no timer outlives the call. `tests/agent/deepgram/DeepgramVoiceAgent.test.ts` (`close during CONNECTING…`) covers the agent half alone. `tests/fixtures/calls/server-shutdown-completes-armed-transfer.json` — SIGTERM while a transfer is armed; teardown dispatches (`session.transfer_teardown`), never abandons.
 
 **V4. No session starts from an unauthenticated socket, and the caller number never comes from client-supplied data.** It comes from the signature-validated `/twilio/voice` webhook by way of the call registry. Anything else is an identity claim, and `VoiceSessionOpener::audienceAllows` treats it as authentication. On `/web/media` the session id comes from a signed token, not from `randomUUID()` in the constructor.
 
@@ -66,3 +66,4 @@ Fixture: the mechanism is the fixture set. Precedent from this sprint:
 | Two function calls, two fillers | `two-function-calls-one-request.json` |
 | Armed transfer, dead agent socket | `agent-socket-dies-mid-turn.json` |
 | Transfer deadline / teardown abandon | `armed-transfer-deadline.json`, `transfer-abandoned-on-caller-hangup.json` |
+| SIGTERM drain completes an armed transfer | `server-shutdown-completes-armed-transfer.json` |

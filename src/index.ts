@@ -12,6 +12,9 @@ import { KeevarisClient } from './delegation/KeevarisClient.js'
 import { ConnectionRejectedError } from './errors.js'
 import { logger } from './logger.js'
 import { ConnectionGate } from './server/ConnectionGate.js'
+import { DependencyHealth } from './server/DependencyHealth.js'
+import { installGracefulShutdown } from './server/GracefulShutdown.js'
+import { ReadinessState } from './server/ReadinessState.js'
 import { handleTwilioVoiceWebhook } from './server/twilioVoiceWebhook.js'
 import { SessionLifecycleClient } from './session/SessionLifecycleClient.js'
 import { TranscriptClient } from './session/TranscriptClient.js'
@@ -42,6 +45,28 @@ function createCallRegistry(): CallRegistry {
 const callRegistry = createCallRegistry()
 const webTokenService = new WebTokenService(config.webToken.secret)
 const connectionGate = new ConnectionGate(config.maxConcurrentSessions)
+const dependencyHealth = new DependencyHealth(
+  config.dependencyHealth.staleAfterMs,
+  config.dependencyHealth.sweepIntervalMs
+)
+dependencyHealth.startSweeping()
+const readiness = new ReadinessState(dependencyHealth)
+
+function writeLive(response: ServerResponse): void {
+  response.writeHead(200, { 'Content-Type': 'application/json' })
+  response.end(JSON.stringify({ status: 'ok' }))
+}
+
+function writeReady(response: ServerResponse): void {
+  if (readiness.isReady()) {
+    response.writeHead(200, { 'Content-Type': 'application/json' })
+    response.end(JSON.stringify({ status: 'ok' }))
+    return
+  }
+
+  response.writeHead(503, { 'Content-Type': 'application/json' })
+  response.end(JSON.stringify({ status: 'not_ready' }))
+}
 
 registerTransport({
   vendor: 'twilio',
@@ -58,10 +83,16 @@ async function handleHttpRequest(request: IncomingMessage, response: ServerRespo
   const url = new URL(request.url ?? '/', config.publicBaseUrl)
 
   try {
-    if (request.method === 'GET' && url.pathname === '/health') {
-      response.writeHead(200, { 'Content-Type': 'application/json' })
-      response.end(JSON.stringify({ status: 'ok' }))
+    if (request.method === 'GET' && url.pathname === '/health/ready') {
+      writeReady(response)
+      return
+    }
 
+    if (
+      request.method === 'GET' &&
+      (url.pathname === '/health' || url.pathname === '/health/live')
+    ) {
+      writeLive(response)
       return
     }
 
@@ -96,7 +127,11 @@ async function handleHttpRequest(request: IncomingMessage, response: ServerRespo
   }
 }
 
-async function handleTransportConnection(module: TransportModule, ws: WebSocket, request: IncomingMessage): Promise<void> {
+async function handleTransportConnection(
+  module: TransportModule,
+  ws: WebSocket,
+  request: IncomingMessage
+): Promise<VoiceSession | undefined> {
   const connectionId = randomUUID()
 
   try {
@@ -104,14 +139,19 @@ async function handleTransportConnection(module: TransportModule, ws: WebSocket,
     const sessionLifecycle = new SessionLifecycleClient(transport.bridgeCredentials)
     const transcript = new TranscriptClient(transport.bridgeCredentials)
     const [bridgeConfig] = await Promise.all([
-      new BridgeConfigClient(transport.bridgeCredentials).fetchConfig(),
+      new BridgeConfigClient(transport.bridgeCredentials, dependencyHealth).fetchConfig(),
       sessionLifecycle.open(transport.sessionId, transport.callerNumber)
     ])
-    const agent = new DeepgramVoiceAgent(transport.sessionId, {
-      greeting: bridgeConfig.greeting,
-      promptAdditions: bridgeConfig.promptAdditions
-    })
-    const keevaris = new KeevarisClient(transport.bridgeCredentials)
+    const agent = new DeepgramVoiceAgent(
+      transport.sessionId,
+      {
+        greeting: bridgeConfig.greeting,
+        promptAdditions: bridgeConfig.promptAdditions
+      },
+      undefined,
+      dependencyHealth
+    )
+    const keevaris = new KeevarisClient(transport.bridgeCredentials, dependencyHealth)
 
     const session = new VoiceSession({
       transport,
@@ -123,6 +163,7 @@ async function handleTransportConnection(module: TransportModule, ws: WebSocket,
       transfer: bridgeConfig.transfer
     })
     await session.start()
+    return session
   } catch (error) {
     if (!(error instanceof ConnectionRejectedError)) {
       logger.error(
@@ -131,6 +172,7 @@ async function handleTransportConnection(module: TransportModule, ws: WebSocket,
       )
     }
     ws.close()
+    return undefined
   }
 }
 
@@ -165,9 +207,35 @@ server.on('upgrade', (request, socket, head) => {
   }
 
   wss.handleUpgrade(request, socket, head, (ws) => {
-    ws.on('close', () => connectionGate.release())
-    void handleTransportConnection(module, ws, request)
+    let closed = false
+    let session: VoiceSession | undefined
+
+    ws.on('close', () => {
+      closed = true
+      connectionGate.release()
+      if (session !== undefined) {
+        connectionGate.unregisterSession(session)
+      }
+    })
+
+    void handleTransportConnection(module, ws, request).then((created) => {
+      if (created === undefined) {
+        return
+      }
+
+      session = created
+      if (!closed) {
+        connectionGate.registerSession(created)
+      }
+    })
   })
+})
+
+installGracefulShutdown({
+  server,
+  connectionGate,
+  readiness,
+  graceMs: config.shutdown.graceMs
 })
 
 server.listen(config.port, () => {

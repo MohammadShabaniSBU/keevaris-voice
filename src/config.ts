@@ -106,7 +106,12 @@ const envSchema = z
   // ChannelProfile::Voice is 600 chars / 2 sentences. Neural TTS at ~150 wpm
   // is ~40s for that ceiling; 45s leaves a small margin so the arm deadline
   // cannot cut the handoff sentence we are waiting to finish.
-  TRANSFER_ARM_DEADLINE_MS: z.coerce.number().int().positive().default(45_000)
+  TRANSFER_ARM_DEADLINE_MS: z.coerce.number().int().positive().default(45_000),
+  // Generous enough for a typical remaining call, not indefinite.
+  SHUTDOWN_GRACE_MS: z.coerce.number().int().positive().default(120_000),
+  // A recorded Deepgram/API failure older than this no longer counts.
+  DEPENDENCY_HEALTH_STALE_MS: z.coerce.number().int().positive().default(60_000),
+  DEPENDENCY_HEALTH_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(5_000)
   })
   .superRefine((data, ctx) => {
     if (data.CALL_REGISTRY_BACKEND !== 'redis') {
@@ -222,5 +227,14 @@ export const config = {
     // is ~40s for that ceiling; 45s leaves a small margin so the arm deadline
     // cannot cut the handoff sentence we are waiting to finish.
     transferArmDeadlineMs: env.TRANSFER_ARM_DEADLINE_MS
+  },
+
+  shutdown: {
+    graceMs: env.SHUTDOWN_GRACE_MS
+  },
+
+  dependencyHealth: {
+    staleAfterMs: env.DEPENDENCY_HEALTH_STALE_MS,
+    sweepIntervalMs: env.DEPENDENCY_HEALTH_SWEEP_INTERVAL_MS
   }
 } as const

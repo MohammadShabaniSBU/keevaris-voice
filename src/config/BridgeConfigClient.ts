@@ -1,6 +1,7 @@
 import { ASK_KEEVARIS_FUNCTION_NAME } from '../agent/prompt.js'
 import { config, type BridgeCredentials } from '../config.js'
 import { logger } from '../logger.js'
+import type { DependencyHealthReporter } from '../server/DependencyHealth.js'
 import type { BridgeConfig } from './types.js'
 
 const FALLBACK_GREETING_TEMPLATE = 'I am an automated assistant for {company}.'
@@ -43,7 +44,10 @@ export function fallbackBridgeConfig(): BridgeConfig {
  * timeout, non-2xx, and malformed bodies all log and fall back.
  */
 export class BridgeConfigClient {
-  constructor(private readonly credentials: BridgeCredentials) {}
+  constructor(
+    private readonly credentials: BridgeCredentials,
+    private readonly dependencyHealth?: DependencyHealthReporter
+  ) {}
 
   private configUrl(): string {
     return new URL(
@@ -68,22 +72,28 @@ export class BridgeConfigClient {
 
       if (!response.ok) {
         logger.error({ status: response.status }, 'bridge_config.fetch_failed')
-        return fallbackBridgeConfig()
+        return this.fallback()
       }
 
       const parsed = parseBridgeConfig(await response.json())
       if (parsed === null) {
         logger.error({}, 'bridge_config.fetch_failed')
-        return fallbackBridgeConfig()
+        return this.fallback()
       }
 
+      this.dependencyHealth?.report('keevaris', true)
       return parsed
     } catch (error) {
       logger.error({ error: (error as Error).message }, 'bridge_config.fetch_failed')
-      return fallbackBridgeConfig()
+      return this.fallback()
     } finally {
       clearTimeout(timeout)
     }
+  }
+
+  private fallback(): BridgeConfig {
+    this.dependencyHealth?.report('keevaris', false)
+    return fallbackBridgeConfig()
   }
 }
 
