@@ -105,7 +105,14 @@ async function handleHttpRequest(request: IncomingMessage, response: ServerRespo
     }
 
     if (config.allowDevPage && request.method === 'GET' && url.pathname === '/dev/token') {
-      const minted = webTokenService.mint('dev-page', config.webToken.ttlMs, defaultVoiceBridgePhoneNumber)
+      const raw = url.searchParams.get('caller_number')
+      const callerNumber = raw !== null && raw.trim() !== '' ? raw.trim() : null
+      const minted = webTokenService.mint(
+        'dev-page',
+        config.webToken.ttlMs,
+        defaultVoiceBridgePhoneNumber,
+        callerNumber
+      )
       response.writeHead(200, { 'Content-Type': 'application/json' })
       response.end(JSON.stringify(minted))
 

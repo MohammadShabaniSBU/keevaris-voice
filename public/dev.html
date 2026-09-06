@@ -6,6 +6,8 @@
   <style>
     body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
     button { font-size: 16px; padding: 8px 16px; }
+    label { display: block; margin: 16px 0 8px; }
+    input[type="tel"] { font-size: 16px; padding: 6px 8px; width: 100%; box-sizing: border-box; }
     #log { white-space: pre-wrap; background: #111; color: #ccc; padding: 12px; height: 320px; overflow-y: auto; font-family: monospace; font-size: 13px; margin-top: 16px; }
     #status { font-weight: bold; }
   </style>
@@ -18,8 +20,12 @@
     no panel integration.
   </p>
   <p>Status: <span id="status">idle</span></p>
-  <button id="start">Start call</button>
-  <button id="stop" disabled>Stop</button>
+  <label for="caller-number">Caller / SMS number (optional, E.164)</label>
+  <input id="caller-number" type="tel" placeholder="+15555550100" autocomplete="tel" />
+  <p>
+    <button id="start">Start call</button>
+    <button id="stop" disabled>Stop</button>
+  </p>
   <div id="log"></div>
 
   <script type="module">
@@ -30,6 +36,7 @@
     const logEl = document.getElementById('log')
     const startButton = document.getElementById('start')
     const stopButton = document.getElementById('stop')
+    const callerNumberInput = document.getElementById('caller-number')
 
     let ws = null
     let audioCtx = null
@@ -89,7 +96,12 @@
       startButton.disabled = true
       setStatus('connecting')
 
-      const tokenResponse = await fetch('/dev/token')
+      const tokenUrl = new URL('/dev/token', location.origin)
+      const callerNumber = callerNumberInput.value.trim()
+      if (callerNumber !== '') {
+        tokenUrl.searchParams.set('caller_number', callerNumber)
+      }
+      const tokenResponse = await fetch(tokenUrl)
       if (!tokenResponse.ok) {
         throw new Error(`token request failed: ${tokenResponse.status}`)
       }

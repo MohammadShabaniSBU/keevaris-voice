@@ -16,7 +16,51 @@ test('mint/verify round trip returns claims', () => {
   assert.equal(claims?.sessionId, minted.sessionId)
   assert.equal(claims?.purpose, 'dev-page')
   assert.equal(claims?.phoneNumber, '+15555550100')
+  assert.equal(claims?.callerNumber, null)
   assert.equal(claims?.expiresAt, minted.expiresAt)
+})
+
+test('mint/verify round trip keeps a caller number claim', () => {
+  const now = 1_000
+  const service = new WebTokenService(SECRET, () => now)
+  const minted = service.mint('dev-page', 60_000, '+15555550100', '+15555550199')
+
+  const claims = service.verify(minted.token)
+
+  assert.notEqual(claims, null)
+  assert.equal(claims?.callerNumber, '+15555550199')
+})
+
+test('token omitting callerNumber verifies as null', () => {
+  const service = new WebTokenService(SECRET)
+  const claims = {
+    sessionId: 'sess_omit_caller',
+    purpose: 'dev-page',
+    phoneNumber: '+15555550100',
+    expiresAt: Date.now() + 60_000
+  }
+  const payload = Buffer.from(JSON.stringify(claims), 'utf8').toString('base64url')
+  const signature = createHmac('sha256', SECRET).update(payload).digest('base64url')
+
+  const verified = service.verify(`${payload}.${signature}`)
+
+  assert.notEqual(verified, null)
+  assert.equal(verified?.callerNumber, null)
+})
+
+test('token with a non-string callerNumber returns null', () => {
+  const service = new WebTokenService(SECRET)
+  const claims = {
+    sessionId: 'sess_bad_caller',
+    purpose: 'dev-page',
+    phoneNumber: '+15555550100',
+    callerNumber: 15555550199,
+    expiresAt: Date.now() + 60_000
+  }
+  const payload = Buffer.from(JSON.stringify(claims), 'utf8').toString('base64url')
+  const signature = createHmac('sha256', SECRET).update(payload).digest('base64url')
+
+  assert.equal(service.verify(`${payload}.${signature}`), null)
 })
 
 test('expired token returns null', () => {

@@ -10,6 +10,7 @@ export interface WebTokenClaims {
   sessionId: string
   purpose: string
   phoneNumber: string
+  callerNumber: string | null
   expiresAt: number
 }
 
@@ -43,12 +44,18 @@ export class WebTokenService {
     private readonly now: () => number = Date.now
   ) {}
 
-  mint(purpose: string, ttlMs: number, phoneNumber: string): MintedWebToken {
+  mint(
+    purpose: string,
+    ttlMs: number,
+    phoneNumber: string,
+    callerNumber: string | null = null
+  ): MintedWebToken {
     const expiresAt = this.now() + ttlMs
     const claims: WebTokenClaims = {
       sessionId: randomUUID(),
       purpose,
       phoneNumber,
+      callerNumber,
       expiresAt
     }
     const payload = base64UrlEncode(JSON.stringify(claims))
@@ -105,6 +112,14 @@ export class WebTokenService {
       return null
     }
 
+    if (
+      claims.callerNumber !== undefined &&
+      claims.callerNumber !== null &&
+      typeof claims.callerNumber !== 'string'
+    ) {
+      return null
+    }
+
     if (claims.expiresAt <= this.now()) {
       return null
     }
@@ -115,7 +130,10 @@ export class WebTokenService {
 
     this.consumed.set(claims.sessionId, claims.expiresAt)
 
-    return claims
+    return {
+      ...claims,
+      callerNumber: typeof claims.callerNumber === 'string' ? claims.callerNumber : null
+    }
   }
 
   private sign(payload: string): string {

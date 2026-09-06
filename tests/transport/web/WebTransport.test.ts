@@ -68,6 +68,16 @@ test('createWebTransport accepts valid token and uses sessionId from claims', as
   assert.deepEqual(transport.bridgeCredentials, TEST_CREDENTIALS)
 })
 
+test('createWebTransport reads callerNumber from the signed token', async () => {
+  const ws = new FakeRawSocket()
+  const service = new WebTokenService(SECRET)
+  const minted = service.mint('dev-page', 60_000, '+15555550100', '+15555550199')
+
+  const transport = await createWebTransport(ws, buildRequest(minted.token), service)
+
+  assert.equal(transport.callerNumber, '+15555550199')
+})
+
 test('createWebTransport rejects unresolvable phoneNumber', async () => {
   const ws = new FakeRawSocket()
   const service = new WebTokenService(SECRET)

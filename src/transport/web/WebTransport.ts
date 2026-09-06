@@ -11,10 +11,10 @@ const AUDIO_OUTPUT: AudioFormat = { encoding: 'linear16', sampleRate: 24000 }
 
 /**
  * Browser mic session (panel copilot, or `public/dev.html` for local
- * testing). No phone system in the middle, so there is no caller number and
- * no separate "ringing" webhook step — the session id comes from the signed
- * token minted before the socket connects, and the connection carries raw
- * PCM16 audio directly.
+ * testing). No phone system in the middle, so there is no separate "ringing"
+ * webhook step — the session id and optional caller number come from the
+ * signed token minted before the socket connects, and the connection carries
+ * raw PCM16 audio directly.
  *
  * Wire protocol on this socket:
  *  - binary frames: PCM16 audio (mic in from the browser, agent audio out)
@@ -26,7 +26,7 @@ export class WebTransport implements Transport {
   readonly audioInput = AUDIO_INPUT
   readonly audioOutput = AUDIO_OUTPUT
   readonly sessionId: string
-  readonly callerNumber: string | null = null
+  readonly callerNumber: string | null
   readonly bridgeCredentials: BridgeCredentials
 
   private readonly audioHandlers: Array<(chunk: Buffer) => void> = []
@@ -37,10 +37,12 @@ export class WebTransport implements Transport {
   constructor(
     private readonly ws: RawSocket,
     sessionId: string,
-    bridgeCredentials: BridgeCredentials
+    bridgeCredentials: BridgeCredentials,
+    callerNumber: string | null = null
   ) {
     this.bridgeCredentials = bridgeCredentials
     this.sessionId = sessionId
+    this.callerNumber = callerNumber
     this.log = logger.child({ component: 'web-transport', sessionId: this.sessionId })
 
     ws.on('message', (data: Buffer, isBinary: boolean) => {
@@ -129,5 +131,5 @@ export async function createWebTransport(
     throw new ConnectionRejectedError('unknown phone number')
   }
 
-  return new WebTransport(ws, claims.sessionId, credentials)
+  return new WebTransport(ws, claims.sessionId, credentials, claims.callerNumber)
 }
