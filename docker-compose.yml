@@ -1,0 +1,19 @@
+services:
+  voice:
+    build: .
+    container_name: keevaris-voice
+    networks:
+      - traefik-network
+    environment:
+      - NODE_ENV=production
+    env_file:
+      - .env
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+networks:
+  traefik-network:
+    external: true
