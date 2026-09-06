@@ -50,8 +50,11 @@ export function buildSettingsMessage(input: AudioFormat, output: AudioFormat, op
           }
         ]
       },
+      // Aura (default DEEPGRAM_SPEAK_MODEL) is not a Flux model. Deepgram
+      // treats speak.provider.version = "v2" as Flux-only and rejects Aura
+      // with Settings never applying — the web/Twilio socket then tears down.
       speak: {
-        provider: { type: 'deepgram', version: 'v2', model: config.deepgram.speakModel }
+        provider: { type: 'deepgram', model: config.deepgram.speakModel }
       },
       greeting: options.greeting
     }
