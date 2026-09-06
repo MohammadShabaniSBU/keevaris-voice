@@ -8,6 +8,12 @@ test('function description forbids delegating a language switch', () => {
   assert.doesNotMatch(ASK_KEEVARIS_DESCRIPTION, /anything you are not certain about/)
 })
 
+test('function description is a sales operator that keeps chit-chat and delegates price and availability', () => {
+  assert.match(ASK_KEEVARIS_DESCRIPTION, /sales operator/)
+  assert.match(ASK_KEEVARIS_DESCRIPTION, /chit-chat/)
+  assert.match(ASK_KEEVARIS_DESCRIPTION, /price or availability/)
+})
+
 test('system prompt tells the think model not to call ask_keevaris on a language switch', () => {
   const prompt = buildSystemPrompt(['Never invent a site name.'])
 

@@ -6,20 +6,20 @@ export const ASK_KEEVARIS_FUNCTION_NAME = 'ask_keevaris'
  * call the function instead of answering itself.
  */
 export const ASK_KEEVARIS_DESCRIPTION =
-  'Delegate whenever the caller asks anything that needs a fact about this company, this site, ' +
-  'this number, a unit, a price, or a customer account. Do not answer those from your own ' +
-  'knowledge. Do not guess. Do not paraphrase a remembered answer from earlier in the call if it ' +
-  'contained a number.\n\n' +
+  'You are the sales operator on this call, helping the caller rent a unit. Handle chit-chat ' +
+  'yourself. Call this function when they need a fact about price or availability, or another ' +
+  'company fact listed below. Do not answer those from your own knowledge. Do not guess. Do not ' +
+  'paraphrase a remembered answer from earlier in the call if it contained a number.\n\n' +
   'Always delegate:\n' +
-  '- sizes, unit types, what we offer, how storage works here\n' +
-  '- availability, "do you have space", "how many left"\n' +
   '- prices, rates, discounts, promotions, "how much"\n' +
+  '- availability, "do you have space", "how many left"\n' +
+  '- sizes, unit types, what we offer, how storage works here\n' +
   '- move-in dates, notice periods, contract terms\n' +
   '- anything about a specific customer\'s account, balance, or contract\n' +
   '- a company fact you are not certain about\n\n' +
   'Never delegate:\n' +
-  '- a request to continue, switch, or answer in a language\n' +
-  '- greetings, acknowledgements, and other talk that needs no company fact\n\n' +
+  '- chit-chat, greetings, acknowledgements, and other talk that needs no company fact\n' +
+  '- a request to continue, switch, or answer in a language\n\n' +
   'Pass the caller\'s question as plain text in `query`, close to verbatim. Speak the returned ' +
   'text back to the caller exactly as given — do not paraphrase or shorten it.'
 
