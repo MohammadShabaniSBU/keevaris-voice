@@ -8,9 +8,9 @@ export interface CallRegistryEntry {
 }
 
 export interface CallRegistry {
-  put(nonce: string, entry: CallRegistryEntry, ttlMs: number): void
+  put(nonce: string, entry: CallRegistryEntry, ttlMs: number): Promise<void>
   /** Single-use: deletes on read. Returns undefined if unknown, expired, or already taken. */
-  take(nonce: string): CallRegistryEntry | undefined
+  take(nonce: string): Promise<CallRegistryEntry | undefined>
 }
 
 export class InProcessCallRegistry implements CallRegistry {
@@ -18,14 +18,14 @@ export class InProcessCallRegistry implements CallRegistry {
 
   constructor(private readonly now: () => number = Date.now) {}
 
-  put(nonce: string, entry: CallRegistryEntry, ttlMs: number): void {
+  async put(nonce: string, entry: CallRegistryEntry, ttlMs: number): Promise<void> {
     this.entries.set(nonce, {
       entry,
       expiresAt: this.now() + ttlMs
     })
   }
 
-  take(nonce: string): CallRegistryEntry | undefined {
+  async take(nonce: string): Promise<CallRegistryEntry | undefined> {
     const stored = this.entries.get(nonce)
     if (stored === undefined) {
       return undefined

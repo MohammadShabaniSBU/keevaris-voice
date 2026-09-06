@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { Redis } from 'ioredis'
 import { WebSocket, WebSocketServer } from 'ws'
 import { DeepgramVoiceAgent } from './agent/deepgram/DeepgramVoiceAgent.js'
 import { config, defaultVoiceBridgePhoneNumber } from './config.js'
@@ -16,7 +17,8 @@ import { SessionLifecycleClient } from './session/SessionLifecycleClient.js'
 import { TranscriptClient } from './session/TranscriptClient.js'
 import { VoiceSession } from './session/VoiceSession.js'
 import { registerTransport, resolveTransportModule, type TransportModule } from './transport/registry.js'
-import { InProcessCallRegistry } from './transport/twilio/CallRegistry.js'
+import { InProcessCallRegistry, type CallRegistry } from './transport/twilio/CallRegistry.js'
+import { RedisCallRegistry } from './transport/twilio/RedisCallRegistry.js'
 import { createTwilioTransport, TWILIO_WS_PATH } from './transport/twilio/TwilioTransport.js'
 import { WebTokenService } from './transport/web/WebToken.js'
 import { createWebTransport, WEB_WS_PATH } from './transport/web/WebTransport.js'
@@ -24,7 +26,20 @@ import { createWebTransport, WEB_WS_PATH } from './transport/web/WebTransport.js
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
 const publicDir = path.join(currentDir, '..', 'public')
 
-const callRegistry = new InProcessCallRegistry()
+function createCallRegistry(): CallRegistry {
+  if (config.callRegistry.backend !== 'redis') {
+    return new InProcessCallRegistry()
+  }
+
+  const redis = new Redis(config.callRegistry.redisUrl as string)
+  redis.on('error', (error: Error) => {
+    logger.error({ error: error.message }, 'redis.client_error')
+  })
+
+  return new RedisCallRegistry(redis)
+}
+
+const callRegistry = createCallRegistry()
 const webTokenService = new WebTokenService(config.webToken.secret)
 const connectionGate = new ConnectionGate(config.maxConcurrentSessions)
 

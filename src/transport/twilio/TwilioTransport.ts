@@ -39,6 +39,8 @@ export class TwilioTransport implements Transport {
   private readonly readyPromise: Promise<void>
   private resolveReady!: () => void
   private rejectReady!: (error: Error) => void
+  private readySettled = false
+  private messageChain: Promise<void> = Promise.resolve()
 
   constructor(
     private readonly ws: RawSocket,
@@ -46,15 +48,33 @@ export class TwilioTransport implements Transport {
     private readonly callRegistry: CallRegistry
   ) {
     this.readyPromise = new Promise<void>((resolve, reject) => {
-      this.resolveReady = resolve
-      this.rejectReady = reject
-      ws.on('message', (data: Buffer) => this.handleMessage(data))
+      this.resolveReady = () => {
+        if (this.readySettled) return
+        this.readySettled = true
+        resolve()
+      }
+      this.rejectReady = (error: Error) => {
+        if (this.readySettled) return
+        this.readySettled = true
+        reject(error)
+      }
+      // Serialize message handling so a later frame cannot run while
+      // `take()` is still awaiting. `.catch` is per-link so one failure
+      // does not kill the rest of the chain.
+      ws.on('message', (data: Buffer) => {
+        this.messageChain = this.messageChain
+          .then(() => this.handleMessage(data))
+          .catch((error: unknown) => {
+            this.log.error({ error: (error as Error).message }, 'twilio.message_handling_failed')
+          })
+      })
       ws.on('close', () => this.emitClose('caller_hangup'))
       ws.on('error', (error: Error) => {
         this.log.error({ error: error.message }, 'twilio.ws_error')
         this.emitClose('error')
       })
     })
+    void this.readyPromise.catch(() => undefined)
   }
 
   get sessionId(): string {
@@ -132,7 +152,7 @@ export class TwilioTransport implements Transport {
     }
   }
 
-  private handleMessage(data: Buffer): void {
+  private async handleMessage(data: Buffer): Promise<void> {
     let message: Record<string, unknown>
     try {
       message = JSON.parse(data.toString('utf8')) as Record<string, unknown>
@@ -144,7 +164,7 @@ export class TwilioTransport implements Transport {
       case 'start': {
         const start = message.start as TwilioStartPayload
         const nonce = start.customParameters?.nonce
-        const entry = nonce !== undefined && nonce !== '' ? this.callRegistry.take(nonce) : undefined
+        const entry = nonce !== undefined && nonce !== '' ? await this.callRegistry.take(nonce) : undefined
 
         if (entry === undefined || entry.callSid !== start.callSid) {
           this.log.warn(
@@ -157,6 +177,15 @@ export class TwilioTransport implements Transport {
           // This close fires ws.on('close') above, which latches caller_hangup — not a security reason.
           this.ws.close(1008, 'policy violation')
           this.rejectReady(new ConnectionRejectedError('invalid nonce'))
+
+          return
+        }
+
+        // Required: `close`/`error` fire outside messageChain. Hangup
+        // during take() latches closedReason before this await settles.
+        // Resolving ready here would start VoiceSession on a dead socket.
+        if (this.closedReason !== undefined) {
+          this.rejectReady(new ConnectionRejectedError('closed before start'))
 
           return
         }
@@ -193,6 +222,7 @@ export class TwilioTransport implements Transport {
     if (this.closedReason !== undefined) return
     this.closedReason = reason
     for (const handler of this.closeHandlers) handler(reason)
+    this.rejectReady(new ConnectionRejectedError('closed before start'))
   }
 }
 

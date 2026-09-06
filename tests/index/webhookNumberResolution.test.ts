@@ -75,7 +75,7 @@ test('known To resolves credentials onto the call registry', async () => {
   assert.equal(captured.headers['Content-Type'], 'text/xml')
 
   const nonce = nonceFromTwiml(captured.body)
-  const entry = registry.take(nonce)
+  const entry = await registry.take(nonce)
   assert.notEqual(entry, undefined)
   assert.equal(entry?.callSid, 'CA123')
   assert.equal(entry?.from, '+15555550111')

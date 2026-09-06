@@ -62,7 +62,7 @@ export async function handleTwilioVoiceWebhook(
   }
 
   const nonce = randomBytes(32).toString('hex')
-  callRegistry.put(
+  await callRegistry.put(
     nonce,
     {
       callSid: params.CallSid ?? '',

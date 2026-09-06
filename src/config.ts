@@ -50,7 +50,8 @@ export function parseVoiceBridgeNumbers(raw: string): Array<VoiceBridgeNumberEnt
  * Every value the process needs, validated once at boot. Fail fast and loud
  * rather than discovering a missing secret mid-call.
  */
-const envSchema = z.object({
+const envSchema = z
+  .object({
   PORT: z.coerce.number().int().positive().default(8787),
   PUBLIC_BASE_URL: z.string().url(),
 
@@ -97,6 +98,8 @@ const envSchema = z.object({
   WEB_TOKEN_SECRET: z.string().min(1, 'WEB_TOKEN_SECRET is required'),
   WEB_TOKEN_TTL_MS: z.coerce.number().int().positive().default(300_000),
   CALL_REGISTRY_TTL_MS: z.coerce.number().int().positive().default(60_000),
+  CALL_REGISTRY_BACKEND: z.enum(['memory', 'redis']).default('memory'),
+  REDIS_URL: z.string().optional(),
   MAX_CONCURRENT_SESSIONS: z.coerce.number().int().positive().default(20),
   MAX_CALL_SECONDS: z.coerce.number().int().positive().default(1800),
   IDLE_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(300),
@@ -104,7 +107,30 @@ const envSchema = z.object({
   // is ~40s for that ceiling; 45s leaves a small margin so the arm deadline
   // cannot cut the handoff sentence we are waiting to finish.
   TRANSFER_ARM_DEADLINE_MS: z.coerce.number().int().positive().default(45_000)
-})
+  })
+  .superRefine((data, ctx) => {
+    if (data.CALL_REGISTRY_BACKEND !== 'redis') {
+      return
+    }
+
+    if (data.REDIS_URL === undefined || data.REDIS_URL === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['REDIS_URL'],
+        message: 'REDIS_URL is required when CALL_REGISTRY_BACKEND is redis'
+      })
+
+      return
+    }
+
+    if (!URL.canParse(data.REDIS_URL)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['REDIS_URL'],
+        message: 'REDIS_URL must be a valid URL'
+      })
+    }
+  })
 
 export type Env = z.infer<typeof envSchema>
 
@@ -182,7 +208,9 @@ export const config = {
   },
 
   callRegistry: {
-    ttlMs: env.CALL_REGISTRY_TTL_MS
+    ttlMs: env.CALL_REGISTRY_TTL_MS,
+    backend: env.CALL_REGISTRY_BACKEND,
+    redisUrl: env.REDIS_URL
   },
 
   maxConcurrentSessions: env.MAX_CONCURRENT_SESSIONS,
