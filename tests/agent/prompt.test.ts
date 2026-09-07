@@ -17,6 +17,16 @@ test('function description is a sales operator that keeps chit-chat and delegate
   assert.doesNotMatch(ASK_KEEVARIS_DESCRIPTION, /Speak the returned text back/)
 })
 
+test('function description delegates writes and forbids inventing them', () => {
+  assert.match(ASK_KEEVARIS_DESCRIPTION, /Always delegate actions/)
+  assert.match(ASK_KEEVARIS_DESCRIPTION, /send a quote, text, SMS, email/)
+  assert.match(ASK_KEEVARIS_DESCRIPTION, /book, schedule, or confirm a site visit/)
+  assert.match(ASK_KEEVARIS_DESCRIPTION, /take a name, phone, or email/)
+  assert.match(ASK_KEEVARIS_DESCRIPTION, /Never say a quote was sent/)
+  assert.match(ASK_KEEVARIS_DESCRIPTION, /Never invent a time or a full phone number/)
+  assert.match(ASK_KEEVARIS_DESCRIPTION, /plus any size, name, phone, or email already given/)
+})
+
 test('system prompt tells the think model not to call ask_keevaris on a language switch', () => {
   const prompt = buildSystemPrompt(['Never invent a site name.'])
 
