@@ -26,7 +26,7 @@ interface DelegationResultForCall {
 function buildFunctionCallStub(result: DelegationResultForCall): string {
   return result.transfer
     ? 'Answered. The caller is being transferred.'
-    : 'Answered. Continue the conversation naturally.'
+    : 'The answer has already been spoken. Do not say anything else. Wait for the caller.'
 }
 
 type SessionState =

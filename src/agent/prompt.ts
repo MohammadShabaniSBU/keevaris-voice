@@ -20,8 +20,9 @@ export const ASK_KEEVARIS_DESCRIPTION =
   'Never delegate:\n' +
   '- chit-chat, greetings, acknowledgements, and other talk that needs no company fact\n' +
   '- a request to continue, switch, or answer in a language\n\n' +
-  'Pass the caller\'s question as plain text in `query`, close to verbatim. Speak the returned ' +
-  'text back to the caller exactly as given — do not paraphrase or shorten it.'
+  'Pass the caller\'s question as plain text in `query`, close to verbatim. The returned answer ' +
+  'is spoken for you. After it plays, do not summarize, rephrase, or add a follow-up. Wait for ' +
+  'the caller.'
 
 /**
  * Structural instructions this service owns (opening-disclosure handling,

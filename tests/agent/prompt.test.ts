@@ -12,6 +12,9 @@ test('function description is a sales operator that keeps chit-chat and delegate
   assert.match(ASK_KEEVARIS_DESCRIPTION, /sales operator/)
   assert.match(ASK_KEEVARIS_DESCRIPTION, /chit-chat/)
   assert.match(ASK_KEEVARIS_DESCRIPTION, /price or availability/)
+  assert.match(ASK_KEEVARIS_DESCRIPTION, /spoken for you/)
+  assert.match(ASK_KEEVARIS_DESCRIPTION, /do not summarize, rephrase, or add a follow-up/i)
+  assert.doesNotMatch(ASK_KEEVARIS_DESCRIPTION, /Speak the returned text back/)
 })
 
 test('system prompt tells the think model not to call ask_keevaris on a language switch', () => {
