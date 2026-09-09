@@ -21,7 +21,7 @@ export const ASK_KEEVARIS_DESCRIPTION =
   'Always delegate actions:\n' +
   '- send a quote, text, SMS, email, or "send me the link"\n' +
   '- book, schedule, or confirm a site visit or viewing\n' +
-  '- take a name, phone, or email to create a contact or send anything\n' +
+  '- take a name to create a contact or send anything — never ask for a phone number or email address; the phone is already known from the call\n' +
   '- hold, reserve, or "get me booked in"\n' +
   '- any move-in date they state\n' +
   '- anything you would have to do, not just say\n\n' +
@@ -29,6 +29,9 @@ export const ASK_KEEVARIS_DESCRIPTION =
   '- chit-chat, greetings, acknowledgements, yes/no/thanks, and other talk that needs no ' +
   'company fact or action\n' +
   '- a request to continue, switch, or answer in a language\n\n' +
+  'Never ask the caller for their phone number or email address, and never say you can\'t see ' +
+  'their phone — the system already has the number from the call. Ask only for a name, then ' +
+  'delegate right away.\n\n' +
   'Never say a quote was sent, a visit is booked, or a contact was created unless that sentence ' +
   'just came back from this function. Never invent a time or a full phone number.\n\n' +
   'Pass the caller\'s question as plain text in `query`, close to verbatim, plus any size, name, ' +

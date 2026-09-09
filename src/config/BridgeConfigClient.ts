@@ -14,8 +14,11 @@ const FALLBACK_PROMPT_ADDITIONS: Array<string> = [
     `(${ASK_KEEVARIS_FUNCTION_NAME}). Never invent those figures.`,
   'Always call the other agent ' +
     `(${ASK_KEEVARIS_FUNCTION_NAME}) to do any action: send a quote, text, SMS, email, or link; ` +
-    'book, schedule, or confirm a visit; take a name, phone, or email; hold or reserve a unit; ' +
+    'book, schedule, or confirm a visit; take a name; hold or reserve a unit; ' +
     'resolve a move-in date. Never invent a time or a full phone number.',
+  'Never ask the caller for their phone number or email address, and never say you can\'t see ' +
+    'their phone — the system already has the number from the call. Ask only for a name, then ' +
+    'delegate right away.',
   'Never say a quote was sent, a visit is booked, or a contact was created unless that sentence ' +
     'just came back from the other agent.',
   "Never answer a question about a specific customer's account from memory. Delegate it.",
