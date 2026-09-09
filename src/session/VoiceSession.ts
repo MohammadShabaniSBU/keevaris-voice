@@ -76,6 +76,7 @@ export class VoiceSession {
   private durationCapTimer: ReturnType<typeof setTimeout> | undefined
   private idleTimer: ReturnType<typeof setTimeout> | undefined
   private transferDeadlineTimer: ReturnType<typeof setTimeout> | undefined
+  private functionCallsTail: Promise<void> = Promise.resolve()
 
   constructor(private readonly deps: VoiceSessionDeps) {
     this.log = logger.child({
@@ -152,7 +153,14 @@ export class VoiceSession {
         )
         break
       case 'functionCalls':
-        void this.handleFunctionCalls(event.calls)
+        this.functionCallsTail = this.functionCallsTail
+          .then(() => this.handleFunctionCalls(event.calls))
+          .catch((error: unknown) => {
+            this.log.error(
+              { sessionId: this.deps.transport.sessionId, error: String(error) },
+              'session.function_calls_failed'
+            )
+          })
         break
       case 'agentAudioDone':
         this.handleAgentAudioDone()
@@ -199,44 +207,44 @@ export class VoiceSession {
       agent.injectAgentMessage(this.deps.filler)
     }
 
-    const results = await Promise.all(
-      parsed.map(async (entry, index) => {
-        if (entry.query === '') {
-          return {
-            call: entry.call,
-            text: 'I could not understand the question, please ask again.',
-            transfer: false,
-            destination: undefined
-          }
-        }
-
-        const result = await keevaris.ask({
-          query: entry.query,
-          turn_id: `${turnId}:${index}`,
-          session_id: sessionId,
-          caller_number: transport.callerNumber,
-          caller_utterance: this.lastCallerUtterance ?? null
-        })
-
-        this.sessionLog(
-          {
-            sessionId,
-            id: entry.call.id,
-            transfer: result.transfer,
-            destination: result.destination,
-            clientFallback: result.clientFallback === true
-          },
-          'session.delegation_result'
-        )
-
-        return {
+    const results: Array<DelegationResultForCall> = []
+    for (const [index, entry] of parsed.entries()) {
+      if (entry.query === '') {
+        results.push({
           call: entry.call,
-          text: result.text,
-          transfer: result.transfer,
-          destination: result.destination
-        }
+          text: 'I could not understand the question, please ask again.',
+          transfer: false,
+          destination: undefined
+        })
+        continue
+      }
+
+      const result = await keevaris.ask({
+        query: entry.query,
+        turn_id: `${turnId}:${index}`,
+        session_id: sessionId,
+        caller_number: transport.callerNumber,
+        caller_utterance: this.lastCallerUtterance ?? null
       })
-    )
+
+      this.sessionLog(
+        {
+          sessionId,
+          id: entry.call.id,
+          transfer: result.transfer,
+          destination: result.destination,
+          clientFallback: result.clientFallback === true
+        },
+        'session.delegation_result'
+      )
+
+      results.push({
+        call: entry.call,
+        text: result.text,
+        transfer: result.transfer,
+        destination: result.destination
+      })
+    }
 
     if (this.state.status === 'closing' || this.state.status === 'closed') {
       return

@@ -1,0 +1,66 @@
+{
+  "name": "queued-function-calls-across-events",
+  "note": "V7. A second FunctionCallRequest while the first ask is still delayed must not start until ask_done of the first. Fails without the VoiceSession functionCalls queue.",
+  "delegation": {
+    "delayMs": 200,
+    "responses": [
+      {
+        "text": "We are open from 8am to 6pm.",
+        "transfer": false
+      },
+      {
+        "text": "A 10 by 10 is 89 a month.",
+        "transfer": false
+      }
+    ]
+  },
+  "events": [
+    { "at": 0, "from": "agentSocket", "kind": "open" },
+    { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
+    { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
+    {
+      "at": 100,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "FunctionCallRequest",
+        "functions": [
+          {
+            "id": "fc_1",
+            "name": "ask_keevaris",
+            "arguments": "{\"query\":\"what are your hours?\"}",
+            "client_side": true
+          }
+        ]
+      }
+    },
+    {
+      "at": 150,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "FunctionCallRequest",
+        "functions": [
+          {
+            "id": "fc_2",
+            "name": "ask_keevaris",
+            "arguments": "{\"query\":\"how much is a 10 by 10?\"}",
+            "client_side": true
+          }
+        ]
+      }
+    },
+    { "at": 700, "from": "clock", "kind": "advance" },
+    { "at": 1000, "from": "clock", "kind": "advance" }
+  ],
+  "expect": [
+    { "on": "delegation", "kind": "ask", "turnId": "sess_fixture:1:0" },
+    { "on": "delegation", "kind": "ask_done", "turnId": "sess_fixture:1:0" },
+    { "on": "delegation", "kind": "ask", "turnId": "sess_fixture:2:0" },
+    { "on": "delegation", "kind": "ask_done", "turnId": "sess_fixture:2:0" }
+  ],
+  "count": [
+    { "on": "delegation", "kind": "ask", "exactly": 2 },
+    { "on": "delegation", "kind": "ask_done", "exactly": 2 }
+  ]
+}

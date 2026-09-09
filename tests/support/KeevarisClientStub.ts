@@ -39,23 +39,33 @@ export class KeevarisClientStub implements DelegationClient {
       turnId: request.turn_id
     })
 
+    const finish = (response: DelegationResponse): DelegationResponse => {
+      this.log?.push({
+        on: 'delegation',
+        kind: 'ask_done',
+        turnId: request.turn_id
+      })
+
+      return response
+    }
+
     if (this.config.reject === true) {
-      return Promise.resolve({
+      return Promise.resolve(finish({
         text: 'Let me put you through to someone who can help.',
         transfer: true,
         destination: 'main_line',
         clientFallback: true
-      })
+      }))
     }
 
     const response = this.nextResponse()
     const delayMs = this.config.delayMs ?? 0
     if (delayMs <= 0) {
-      return Promise.resolve(response)
+      return Promise.resolve(finish(response))
     }
 
     return new Promise((resolve) => {
-      setTimeout(() => resolve(response), delayMs)
+      setTimeout(() => resolve(finish(response)), delayMs)
     })
   }
 

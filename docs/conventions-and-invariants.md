@@ -67,3 +67,4 @@ Fixture: the mechanism is the fixture set. Precedent from this sprint:
 | Armed transfer, dead agent socket | `agent-socket-dies-mid-turn.json` |
 | Transfer deadline / teardown abandon | `armed-transfer-deadline.json`, `transfer-abandoned-on-caller-hangup.json` |
 | SIGTERM drain completes an armed transfer | `server-shutdown-completes-armed-transfer.json` |
+| Second FunctionCallRequest while first ask is in flight | `queued-function-calls-across-events.json` |
