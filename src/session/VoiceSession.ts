@@ -151,9 +151,7 @@ export class VoiceSession {
         break
       case 'userStartedSpeaking':
         this.deps.transport.clearAudio()
-        this.clearFillerSoundMinHold()
-        this.fillerSound.stop()
-        this.fillerSoundState = 'idle'
+        this.stopFillerSound('barge_in')
         if (this.pendingAnswer !== undefined) {
           this.deliverAnswer(this.pendingAnswer)
         }
@@ -226,6 +224,7 @@ export class VoiceSession {
     if (needsDelegation) {
       this.enqueueSpeech('filler')
       this.fillerSoundState = 'armed'
+      this.sessionLog({ sessionId }, 'session.filler_sound_armed')
       agent.injectAgentMessage(this.deps.filler)
     }
 
@@ -337,6 +336,13 @@ export class VoiceSession {
     if (completed === 'filler' && this.fillerSoundState === 'armed') {
       this.fillerSoundState = 'playing'
       this.fillerSound.start(this.deps.transport)
+      this.sessionLog(
+        {
+          sessionId: this.deps.transport.sessionId,
+          answerReady: this.pendingAnswer !== undefined
+        },
+        'session.filler_sound_started'
+      )
       if (this.pendingAnswer !== undefined) {
         this.armFillerSoundMinHold()
       }
@@ -398,10 +404,8 @@ export class VoiceSession {
       return
     }
 
-    this.clearFillerSoundMinHold()
     this.pendingAnswer = undefined
-    this.fillerSound.stop()
-    this.fillerSoundState = 'idle'
+    this.stopFillerSound('teardown')
 
     if (this.state.status === 'transferring' && !this.transferDispatched) {
       await this.completeTransfer('teardown')
@@ -495,11 +499,34 @@ export class VoiceSession {
    * Speaks the stashed delegated answer and completes the function calls.
    * Transfer still waits for this answer's own `AgentAudioDone`.
    */
-  private deliverAnswer(pending: PendingAnswer): void {
+  private stopFillerSound(reason: 'answer' | 'barge_in' | 'teardown'): void {
+    const wasPlaying = this.fillerSound.isPlaying
+    const previousState = this.fillerSoundState
     this.clearFillerSoundMinHold()
-    this.pendingAnswer = undefined
     this.fillerSound.stop()
     this.fillerSoundState = 'idle'
+    if (previousState === 'idle' && !wasPlaying) {
+      return
+    }
+
+    this.sessionLog(
+      {
+        sessionId: this.deps.transport.sessionId,
+        reason,
+        wasPlaying,
+        previousState
+      },
+      'session.filler_sound_stopped'
+    )
+  }
+
+  /**
+   * Speaks the stashed delegated answer and completes the function calls.
+   * Transfer still waits for this answer's own `AgentAudioDone`.
+   */
+  private deliverAnswer(pending: PendingAnswer): void {
+    this.pendingAnswer = undefined
+    this.stopFillerSound('answer')
 
     if (this.state.status === 'closing' || this.state.status === 'closed') {
       return
