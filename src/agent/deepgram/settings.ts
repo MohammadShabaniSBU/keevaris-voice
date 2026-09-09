@@ -31,7 +31,11 @@ export function buildSettingsMessage(input: AudioFormat, output: AudioFormat, op
         provider: { type: 'deepgram', version: 'v2', model: config.deepgram.listenModel }
       },
       think: {
-        provider: { type: config.deepgram.thinkProvider, model: config.deepgram.thinkModel },
+        provider: {
+          type: config.deepgram.thinkProvider,
+          model: config.deepgram.thinkModel,
+          temperature: config.deepgram.thinkTemperature
+        },
         prompt: buildSystemPrompt(options.promptAdditions),
         functions: [
           {

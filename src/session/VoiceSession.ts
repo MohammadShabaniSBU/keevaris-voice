@@ -92,6 +92,13 @@ export class VoiceSession {
   private fillerSoundState: FillerSoundState = 'idle'
   private pendingAnswer: PendingAnswer | undefined
   private fillerSoundMinHoldTimer: ReturnType<typeof setTimeout> | undefined
+  /**
+   * After a delegated answer's own AgentAudioDone, Deepgram's think model
+   * still gets FunctionCallResponse and often speaks again. Drop that
+   * leftover audio/transcript until the caller speaks (V5).
+   */
+  private suppressThinkSpeech = false
+  private thinkSpeechSuppressedLogged = false
 
   constructor(private readonly deps: VoiceSessionDeps) {
     this.log = logger.child({
@@ -139,6 +146,10 @@ export class VoiceSession {
   private handleAgentEvent(event: AgentEvent): void {
     switch (event.type) {
       case 'audio':
+        if (this.suppressThinkSpeech) {
+          this.logThinkSpeechSuppressed('audio')
+          break
+        }
         this.resetIdleTimer()
         this.deps.transport.sendAudio(event.chunk)
         if (this.speech === 'answer' && this.pendingRoundTrip !== undefined) {
@@ -150,6 +161,7 @@ export class VoiceSession {
         }
         break
       case 'userStartedSpeaking':
+        this.clearThinkSpeechSuppress()
         this.deps.transport.clearAudio()
         this.stopFillerSound('barge_in')
         if (this.pendingAnswer !== undefined) {
@@ -158,8 +170,12 @@ export class VoiceSession {
         break
       case 'transcript':
         if (event.role === 'user') {
+          this.clearThinkSpeechSuppress()
           this.lastCallerUtterance = event.text
           this.lastCallerUtteranceAt = Date.now()
+        } else if (this.suppressThinkSpeech) {
+          this.logThinkSpeechSuppressed('transcript')
+          break
         }
         this.pushTranscript({
           role: event.role === 'user' ? 'caller' : 'agent',
@@ -348,8 +364,11 @@ export class VoiceSession {
       }
     }
 
-    if (completed === 'answer' && this.state.status === 'transferring') {
-      void this.completeTransfer('answer_done')
+    if (completed === 'answer') {
+      this.suppressThinkSpeech = true
+      if (this.state.status === 'transferring') {
+        void this.completeTransfer('answer_done')
+      }
     }
   }
 
@@ -405,6 +424,7 @@ export class VoiceSession {
     }
 
     this.pendingAnswer = undefined
+    this.clearThinkSpeechSuppress()
     this.stopFillerSound('teardown')
 
     if (this.state.status === 'transferring' && !this.transferDispatched) {
@@ -484,6 +504,23 @@ export class VoiceSession {
         this.deliverAnswer(this.pendingAnswer)
       }
     }, FILLER_SOUND_MIN_MS)
+  }
+
+  private clearThinkSpeechSuppress(): void {
+    this.suppressThinkSpeech = false
+    this.thinkSpeechSuppressedLogged = false
+  }
+
+  private logThinkSpeechSuppressed(dropped: 'audio' | 'transcript'): void {
+    if (this.thinkSpeechSuppressedLogged) {
+      return
+    }
+
+    this.thinkSpeechSuppressedLogged = true
+    this.sessionLog(
+      { sessionId: this.deps.transport.sessionId, dropped },
+      'session.think_speech_suppressed'
+    )
   }
 
   private clearFillerSoundMinHold(): void {

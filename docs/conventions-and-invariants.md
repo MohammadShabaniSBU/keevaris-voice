@@ -32,13 +32,13 @@ Enforced by: `handleTwilioVoiceWebhook` + `InProcessCallRegistry` (`src/index.ts
 
 Fixture: `tests/transport/twilio/TwilioTransport.test.ts` (forged `start` frame, replayed nonce, `CallSid` mismatch); `tests/transport/twilio/CallRegistry.test.ts`; `tests/transport/web/WebToken.test.ts`; `tests/server/ConnectionGate.test.ts`.
 
-**V5. The fast model never speaks a figure that did not come back from a delegated answer.** Prices, availability, dates, balances, unit numbers, access codes. Enforced in the prompt (`buildSystemPrompt` in `src/agent/prompt.ts`) and mechanically: `VoiceSession.handleFunctionCalls` speaks the delegated answer via `agent.injectAgentMessage(result.text)`, bypassing the think model entirely. `FunctionCallResponse` carries only `buildFunctionCallStub(result)`, a fixed acknowledgement string — never the answer text or any figure from it.
+**V5. The fast model never speaks a figure that did not come back from a delegated answer.** Prices, availability, dates, balances, unit numbers, access codes. Enforced in the prompt (`buildSystemPrompt` in `src/agent/prompt.ts`) and mechanically: `VoiceSession.handleFunctionCalls` speaks the delegated answer via `agent.injectAgentMessage(result.text)`, bypassing the think model entirely. `FunctionCallResponse` carries only `buildFunctionCallStub(result)`, a fixed acknowledgement string — never the answer text or any figure from it. After that answer's own `AgentAudioDone`, `VoiceSession` drops leftover think-model audio and agent transcripts until the caller speaks (`suppressThinkSpeech`). `Settings.agent.think.provider.temperature` defaults to 0; that only reduces randomness, it does not mute the leftover turn.
 
 This is a restatement of the API's **invariant 55** ("No money, date, or unit identifier in agent output originates from the model") and must stay in sync with it rather than drift. Sprint-01 task text called this "invariant 73"; that was draft numbering from `S28-02` and never landed in `09`. The rule in `unit-hq-api/docs/09-conventions-and-invariants.md` is 55.
 
 Enforced by: `VoiceSession.handleFunctionCalls` (`src/session/VoiceSession.ts`), `buildFunctionCallStub`, `DeepgramVoiceAgent.injectAgentMessage` / `respondToFunctionCall`.
 
-Fixture: `tests/fixtures/calls/happy-path-single-delegation.json` and `tests/fixtures/calls/two-delegated-answers-one-request.json` assert `InjectAgentMessage` carries the verbatim answer text and `FunctionCallResponse` never contains it (`forbidContent`, per-call via `functionCallId` in the two-answer case).
+Fixture: `tests/fixtures/calls/happy-path-single-delegation.json` and `tests/fixtures/calls/two-delegated-answers-one-request.json` assert `InjectAgentMessage` carries the verbatim answer text and `FunctionCallResponse` never contains it (`forbidContent`, per-call via `functionCallId` in the two-answer case). `tests/fixtures/calls/think-speech-suppressed-after-answer.json` asserts a leftover think-model `ConversationText` plus a uniquely sized audio frame after the answer `AgentAudioDone` never reach `transport.sendAudio` or the transcript.
 
 **Note (V02-01 scope boundary).** `caller_utterance` now flows from this service (`VoiceSession.lastCallerUtterance` → `DelegationRequest.caller_utterance`) to `unit-hq-api`, which persists it on `voice_session_turns`. It is not yet used in grounding or query resolution — its presence on the wire does not mean it is load-bearing in `AgentRuntime` today. Follow-up (wiring it into grounding) belongs to whoever next scopes `AgentRuntime` work, not to this repo.
 
@@ -68,3 +68,4 @@ Fixture: the mechanism is the fixture set. Precedent from this sprint:
 | Transfer deadline / teardown abandon | `armed-transfer-deadline.json`, `transfer-abandoned-on-caller-hangup.json` |
 | SIGTERM drain completes an armed transfer | `server-shutdown-completes-armed-transfer.json` |
 | Second FunctionCallRequest while first ask is in flight | `queued-function-calls-across-events.json` |
+| Think-model leftover after a delegated answer | `think-speech-suppressed-after-answer.json` |

@@ -58,6 +58,9 @@ const envSchema = z
   DEEPGRAM_API_KEY: z.string().min(1, 'DEEPGRAM_API_KEY is required'),
   DEEPGRAM_THINK_PROVIDER: z.string().default('open_ai'),
   DEEPGRAM_THINK_MODEL: z.string().default('gpt-4o-mini'),
+  // Deepgram think.provider.temperature. 0–2 for OpenAI; default 0 so the
+  // fast model does not wander on facts. Does not mute leftover turns.
+  DEEPGRAM_THINK_TEMPERATURE: z.coerce.number().min(0).max(2).default(0),
   DEEPGRAM_LISTEN_MODEL: z.string().default('flux-general-en'),
   DEEPGRAM_SPEAK_MODEL: z.string().default('aura-2-thalia-en'),
   // 8s per https://developers.deepgram.com/docs/agent-keep-alive
@@ -179,6 +182,7 @@ export const config = {
     apiKey: env.DEEPGRAM_API_KEY,
     thinkProvider: env.DEEPGRAM_THINK_PROVIDER,
     thinkModel: env.DEEPGRAM_THINK_MODEL,
+    thinkTemperature: env.DEEPGRAM_THINK_TEMPERATURE,
     listenModel: env.DEEPGRAM_LISTEN_MODEL,
     speakModel: env.DEEPGRAM_SPEAK_MODEL,
     // 8s per https://developers.deepgram.com/docs/agent-keep-alive
