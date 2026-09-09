@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && cp -r src/assets dist/assets",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",

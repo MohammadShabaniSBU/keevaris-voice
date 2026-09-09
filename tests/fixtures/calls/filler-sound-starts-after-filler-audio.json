@@ -1,0 +1,46 @@
+{
+  "name": "filler-sound-starts-after-filler-audio",
+  "note": "Spoken filler TTS (320-byte agent frame) finishes, then the typing clip (160-byte mulaw frames) loops until ask() resolves. A 160-byte send before the 320-byte frame would mean the sound started with the spoken filler.",
+  "delegation": {
+    "delayMs": 300,
+    "response": {
+      "text": "We are open from 8am to 6pm.",
+      "transfer": false
+    }
+  },
+  "events": [
+    { "at": 0, "from": "agentSocket", "kind": "open" },
+    { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
+    { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
+    {
+      "at": 100,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "FunctionCallRequest",
+        "functions": [
+          {
+            "id": "fc_1",
+            "name": "ask_keevaris",
+            "arguments": "{\"query\":\"what are your hours?\"}",
+            "client_side": true
+          }
+        ]
+      }
+    },
+    { "at": 150, "from": "agentSocket", "kind": "audio", "bytes": 320 },
+    { "at": 200, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } },
+    { "at": 280, "from": "clock", "kind": "advance" },
+    { "at": 450, "from": "clock", "kind": "advance" },
+    { "at": 500, "from": "caller", "kind": "close", "reason": "caller_hangup" }
+  ],
+  "expect": [
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "content": "Let me check that for you." },
+    { "on": "transport", "kind": "sendAudio", "bytes": 320 },
+    { "on": "transport", "kind": "sendAudio", "bytes": 160 },
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "content": "We are open from 8am to 6pm." }
+  ],
+  "forbid": [
+    { "on": "transport", "kind": "sendAudio", "bytes": 160, "before": 1 }
+  ]
+}

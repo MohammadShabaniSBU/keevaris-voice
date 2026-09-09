@@ -4,6 +4,7 @@ import { logger } from '../logger.js'
 import type { DelegationResponse } from '../delegation/types.js'
 import { runTransfer } from '../transfer/TransferPolicy.js'
 import type { TransportCloseReason } from '../transport/Transport.js'
+import { FillerSound } from './FillerSound.js'
 import type { TranscriptSegment, VoiceSessionDeps } from './types.js'
 
 interface AskKeevarisArguments {
@@ -36,6 +37,7 @@ type SessionState =
 type SpeechKind = 'nothing' | 'greeting' | 'filler' | 'answer'
 type SpokenKind = Exclude<SpeechKind, 'nothing'>
 type TransferTrigger = 'answer_done' | 'deadline' | 'teardown'
+type FillerSoundState = 'idle' | 'armed' | 'playing'
 
 type SessionLogSink = (entry: { kind: string } & Record<string, unknown>) => void
 
@@ -77,6 +79,8 @@ export class VoiceSession {
   private idleTimer: ReturnType<typeof setTimeout> | undefined
   private transferDeadlineTimer: ReturnType<typeof setTimeout> | undefined
   private functionCallsTail: Promise<void> = Promise.resolve()
+  private readonly fillerSound = new FillerSound()
+  private fillerSoundState: FillerSoundState = 'idle'
 
   constructor(private readonly deps: VoiceSessionDeps) {
     this.log = logger.child({
@@ -136,6 +140,8 @@ export class VoiceSession {
         break
       case 'userStartedSpeaking':
         this.deps.transport.clearAudio()
+        this.fillerSound.stop()
+        this.fillerSoundState = 'idle'
         break
       case 'transcript':
         if (event.role === 'user') {
@@ -204,6 +210,7 @@ export class VoiceSession {
     const needsDelegation = parsed.some((entry) => entry.query !== '')
     if (needsDelegation) {
       this.enqueueSpeech('filler')
+      this.fillerSoundState = 'armed'
       agent.injectAgentMessage(this.deps.filler)
     }
 
@@ -268,6 +275,8 @@ export class VoiceSession {
         })
       )
     }
+    this.fillerSound.stop()
+    this.fillerSoundState = 'idle'
     agent.injectAgentMessage(answerText)
     this.enqueueSpeech('answer')
 
@@ -312,6 +321,11 @@ export class VoiceSession {
   private handleAgentAudioDone(): void {
     const completed = this.speech
     this.speech = this.upcomingSpeech.shift() ?? 'nothing'
+
+    if (completed === 'filler' && this.fillerSoundState === 'armed') {
+      this.fillerSoundState = 'playing'
+      this.fillerSound.start(this.deps.transport)
+    }
 
     if (completed === 'answer' && this.state.status === 'transferring') {
       void this.completeTransfer('answer_done')
@@ -368,6 +382,9 @@ export class VoiceSession {
     if (this.state.status === 'closing' || this.state.status === 'closed') {
       return
     }
+
+    this.fillerSound.stop()
+    this.fillerSoundState = 'idle'
 
     if (this.state.status === 'transferring' && !this.transferDispatched) {
       await this.completeTransfer('teardown')
