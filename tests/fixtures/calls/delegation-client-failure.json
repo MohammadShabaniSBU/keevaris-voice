@@ -25,8 +25,9 @@
       }
     },
     { "at": 200, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } },
-    { "at": 300, "from": "agentSocket", "kind": "audio", "bytes": 320 },
-    { "at": 400, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } }
+    { "at": 1000, "from": "clock", "kind": "advance" },
+    { "at": 1100, "from": "agentSocket", "kind": "audio", "bytes": 320 },
+    { "at": 1200, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } }
   ],
   "expect": [
     { "on": "session", "kind": "session.delegation_result", "clientFallback": true },

@@ -45,7 +45,8 @@
       }
     },
     { "at": 200, "from": "agentSocket", "kind": "audio", "bytes": 320 },
-    { "at": 300, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } }
+    { "at": 300, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } },
+    { "at": 1100, "from": "clock", "kind": "advance" }
   ],
   "expect": [
     {
@@ -56,8 +57,8 @@
       "prompt": "The opening disclosure line has already been spoken to the caller before you receive any input. Do not repeat it, and do not say anything before the caller speaks.\nAnswer in the language the caller is speaking, even if it differs from the opening line's language. If they ask to switch or continue in a language, switch immediately and do not call ask_keevaris.\nNever invent a site name.\nAlways mention the site city when asked."
     },
     { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "content": "Un momento, lo consulto." },
-    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "content": "Tenemos unidades disponibles." },
-    { "on": "transport", "kind": "sendAudio" }
+    { "on": "transport", "kind": "sendAudio" },
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "content": "Tenemos unidades disponibles." }
   ],
   "forbidContent": [
     {

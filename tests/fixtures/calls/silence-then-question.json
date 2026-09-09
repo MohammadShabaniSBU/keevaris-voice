@@ -34,11 +34,12 @@
       }
     },
     { "at": 180100, "from": "agentSocket", "kind": "audio", "bytes": 480 },
-    { "at": 180200, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } }
+    { "at": 180200, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } },
+    { "at": 181000, "from": "clock", "kind": "advance" }
   ],
   "expect": [
-    { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse" },
-    { "on": "transport", "kind": "sendAudio" }
+    { "on": "transport", "kind": "sendAudio" },
+    { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse" }
   ],
   "count": [
     { "on": "agentSocket", "kind": "send", "messageType": "KeepAlive", "exactly": 22 }

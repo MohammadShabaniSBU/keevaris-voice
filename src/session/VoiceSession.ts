@@ -39,6 +39,15 @@ type SpokenKind = Exclude<SpeechKind, 'nothing'>
 type TransferTrigger = 'answer_done' | 'deadline' | 'teardown'
 type FillerSoundState = 'idle' | 'armed' | 'playing'
 
+/** Audible floor after the spoken filler's AgentAudioDone before the answer is injected. */
+export const FILLER_SOUND_MIN_MS = 800
+
+interface PendingAnswer {
+  text: string
+  results: Array<DelegationResultForCall>
+  delegatedSegments: Array<TranscriptSegment>
+}
+
 type SessionLogSink = (entry: { kind: string } & Record<string, unknown>) => void
 
 let sessionLogSink: SessionLogSink | undefined
@@ -81,6 +90,8 @@ export class VoiceSession {
   private functionCallsTail: Promise<void> = Promise.resolve()
   private readonly fillerSound = new FillerSound()
   private fillerSoundState: FillerSoundState = 'idle'
+  private pendingAnswer: PendingAnswer | undefined
+  private fillerSoundMinHoldTimer: ReturnType<typeof setTimeout> | undefined
 
   constructor(private readonly deps: VoiceSessionDeps) {
     this.log = logger.child({
@@ -140,8 +151,12 @@ export class VoiceSession {
         break
       case 'userStartedSpeaking':
         this.deps.transport.clearAudio()
+        this.clearFillerSoundMinHold()
         this.fillerSound.stop()
         this.fillerSoundState = 'idle'
+        if (this.pendingAnswer !== undefined) {
+          this.deliverAnswer(this.pendingAnswer)
+        }
         break
       case 'transcript':
         if (event.role === 'user') {
@@ -275,23 +290,20 @@ export class VoiceSession {
         })
       )
     }
-    this.fillerSound.stop()
-    this.fillerSoundState = 'idle'
-    agent.injectAgentMessage(answerText)
-    this.enqueueSpeech('answer')
-
-    if (this.lastCallerUtteranceAt !== undefined && delegatedSegments.length > 0) {
-      this.pendingRoundTrip = {
-        startedAt: this.lastCallerUtteranceAt,
-        segments: delegatedSegments
-      }
-    }
-
-    for (const result of results) {
-      agent.respondToFunctionCall(result.call.id, result.call.name, buildFunctionCallStub(result))
+    const pending: PendingAnswer = {
+      text: answerText,
+      results,
+      delegatedSegments
     }
 
     this.armTransferIfRequested(results)
+
+    if (this.fillerSoundState === 'armed') {
+      this.pendingAnswer = pending
+      return
+    }
+
+    this.deliverAnswer(pending)
   }
 
   private mintTurnId(): string {
@@ -325,6 +337,9 @@ export class VoiceSession {
     if (completed === 'filler' && this.fillerSoundState === 'armed') {
       this.fillerSoundState = 'playing'
       this.fillerSound.start(this.deps.transport)
+      if (this.pendingAnswer !== undefined) {
+        this.armFillerSoundMinHold()
+      }
     }
 
     if (completed === 'answer' && this.state.status === 'transferring') {
@@ -383,6 +398,8 @@ export class VoiceSession {
       return
     }
 
+    this.clearFillerSoundMinHold()
+    this.pendingAnswer = undefined
     this.fillerSound.stop()
     this.fillerSoundState = 'idle'
 
@@ -452,6 +469,61 @@ export class VoiceSession {
     }
 
     this.clearTransferDeadline()
+    this.clearFillerSoundMinHold()
+  }
+
+  private armFillerSoundMinHold(): void {
+    this.clearFillerSoundMinHold()
+    this.fillerSoundMinHoldTimer = setTimeout(() => {
+      this.fillerSoundMinHoldTimer = undefined
+      if (this.pendingAnswer !== undefined) {
+        this.deliverAnswer(this.pendingAnswer)
+      }
+    }, FILLER_SOUND_MIN_MS)
+  }
+
+  private clearFillerSoundMinHold(): void {
+    if (this.fillerSoundMinHoldTimer === undefined) {
+      return
+    }
+
+    clearTimeout(this.fillerSoundMinHoldTimer)
+    this.fillerSoundMinHoldTimer = undefined
+  }
+
+  /**
+   * Speaks the stashed delegated answer and completes the function calls.
+   * Transfer still waits for this answer's own `AgentAudioDone`.
+   */
+  private deliverAnswer(pending: PendingAnswer): void {
+    this.clearFillerSoundMinHold()
+    this.pendingAnswer = undefined
+    this.fillerSound.stop()
+    this.fillerSoundState = 'idle'
+
+    if (this.state.status === 'closing' || this.state.status === 'closed') {
+      return
+    }
+
+    this.deps.agent.injectAgentMessage(pending.text)
+    this.enqueueSpeech('answer')
+
+    if (this.lastCallerUtteranceAt !== undefined && pending.delegatedSegments.length > 0) {
+      this.pendingRoundTrip = {
+        startedAt: this.lastCallerUtteranceAt,
+        segments: pending.delegatedSegments
+      }
+    }
+
+    for (const result of pending.results) {
+      this.deps.agent.respondToFunctionCall(
+        result.call.id,
+        result.call.name,
+        buildFunctionCallStub(result)
+      )
+    }
+
+    this.armTransferIfRequested(pending.results)
   }
 
   private pushTranscript(segment: Omit<TranscriptSegment, 'sequence' | 'occurred_at'>): TranscriptSegment {
