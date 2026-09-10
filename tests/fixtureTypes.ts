@@ -41,6 +41,7 @@ export const logMatcherSchema = z.object({
   reason: z.string().optional(),
   destinationNumber: z.string().optional(),
   callerUtterance: z.string().nullable().optional(),
+  contextTexts: z.array(z.string()).optional(),
   callerNumber: z.string().nullable().optional(),
   bridgeSessionId: z.string().optional(),
   turnId: z.string().optional(),

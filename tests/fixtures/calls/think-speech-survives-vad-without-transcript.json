@@ -1,0 +1,102 @@
+{
+  "name": "think-speech-survives-vad-without-transcript",
+  "note": "V5 + V7. After the delegated answer's AgentAudioDone, UserStartedSpeaking with no ConversationText must not unlatch suppressThinkSpeech. A leftover think-model ConversationText plus a uniquely sized audio frame stay dropped. A later real user ConversationText clears the mute so subsequent audio reaches the transport.",
+  "delegation": {
+    "delayMs": 80,
+    "response": {
+      "text": "For 20 boxes the size guide suggests 12 to 16 m². A good starting point is the Trastero 12 m² at €183.92 per month all-in.",
+      "transfer": false
+    }
+  },
+  "events": [
+    { "at": 0, "from": "agentSocket", "kind": "open" },
+    { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
+    { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
+    {
+      "at": 50,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "user",
+        "content": "I want to store twenty boxes."
+      }
+    },
+    {
+      "at": 100,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "FunctionCallRequest",
+        "functions": [
+          {
+            "id": "fc_1",
+            "name": "ask_keevaris",
+            "arguments": "{\"query\":\"I want to store twenty boxes.\"}",
+            "client_side": true
+          }
+        ]
+      }
+    },
+    {
+      "at": 150,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "assistant",
+        "content": "Let me check that for you."
+      }
+    },
+    { "at": 200, "from": "agentSocket", "kind": "audio", "bytes": 320 },
+    { "at": 300, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } },
+    { "at": 1100, "from": "clock", "kind": "advance" },
+    { "at": 1150, "from": "agentSocket", "kind": "audio", "bytes": 320 },
+    { "at": 1200, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } },
+    { "at": 1250, "from": "agentSocket", "kind": "control", "message": { "type": "UserStartedSpeaking" } },
+    {
+      "at": 1300,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "assistant",
+        "content": "For twenty boxes, a 5 m² unit would be perfect. The current monthly rate is 85 euros."
+      }
+    },
+    { "at": 1350, "from": "agentSocket", "kind": "audio", "bytes": 77 },
+    {
+      "at": 1500,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "user",
+        "content": "Thanks, that helps."
+      }
+    },
+    { "at": 1600, "from": "agentSocket", "kind": "audio", "bytes": 55 },
+    { "at": 1700, "from": "caller", "kind": "close", "reason": "caller_hangup" }
+  ],
+  "expect": [
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "content": "For 20 boxes the size guide suggests 12 to 16 m². A good starting point is the Trastero 12 m² at €183.92 per month all-in." },
+    { "on": "session", "kind": "session.user_started_speaking" },
+    { "on": "session", "kind": "session.think_speech_suppressed" },
+    { "on": "transport", "kind": "sendAudio", "bytes": 55 }
+  ],
+  "forbidContent": [
+    {
+      "on": "transcript",
+      "kind": "segment",
+      "notContaining": ["85 euros", "5 m² unit would be perfect"]
+    }
+  ],
+  "count": [
+    { "on": "transport", "kind": "sendAudio", "bytes": 77, "exactly": 0 },
+    { "on": "transport", "kind": "sendAudio", "bytes": 55, "exactly": 1 },
+    { "on": "session", "kind": "session.think_speech_suppressed", "exactly": 1 },
+    { "on": "session", "kind": "session.user_started_speaking", "exactly": 1 },
+    { "on": "transcript", "kind": "segment", "source": "fast_model", "exactly": 1 },
+    { "on": "transcript", "kind": "segment", "source": "delegated", "exactly": 1 }
+  ]
+}

@@ -1,7 +1,7 @@
 import type { AgentEvent } from '../agent/AgentProvider.js'
 import { config } from '../config.js'
 import { logger } from '../logger.js'
-import type { DelegationResponse } from '../delegation/types.js'
+import type { DelegationContextSegment, DelegationResponse } from '../delegation/types.js'
 import { runTransfer } from '../transfer/TransferPolicy.js'
 import type { TransportCloseReason } from '../transport/Transport.js'
 import { FillerSound } from './FillerSound.js'
@@ -73,6 +73,8 @@ export class VoiceSession {
   private transferDispatched = false
   private lastCallerUtterance: string | undefined
   private lastCallerUtteranceAt: number | undefined
+  private lastCallerUtteranceSequence: number | undefined
+  private lastMirroredSequence = 0
   private pendingRoundTrip: { startedAt: number; segments: Array<TranscriptSegment> } | undefined
   private turnSequence = 0
   private transcriptSequence = 0
@@ -161,7 +163,10 @@ export class VoiceSession {
         }
         break
       case 'userStartedSpeaking':
-        this.clearThinkSpeechSuppress()
+        this.sessionLog(
+          { sessionId: this.deps.transport.sessionId },
+          'session.user_started_speaking'
+        )
         this.deps.transport.clearAudio()
         this.stopFillerSound('barge_in')
         if (this.pendingAnswer !== undefined) {
@@ -170,18 +175,25 @@ export class VoiceSession {
         break
       case 'transcript':
         if (event.role === 'user') {
-          this.clearThinkSpeechSuppress()
+          if (event.text.trim() !== '') {
+            this.clearThinkSpeechSuppress()
+          }
           this.lastCallerUtterance = event.text
           this.lastCallerUtteranceAt = Date.now()
         } else if (this.suppressThinkSpeech) {
           this.logThinkSpeechSuppressed('transcript')
           break
         }
-        this.pushTranscript({
-          role: event.role === 'user' ? 'caller' : 'agent',
-          text: event.text,
-          source: event.role === 'user' ? 'stt' : 'fast_model'
-        })
+        {
+          const row = this.pushTranscript({
+            role: event.role === 'user' ? 'caller' : 'agent',
+            text: event.text,
+            source: event.role === 'user' ? 'stt' : 'fast_model'
+          })
+          if (event.role === 'user') {
+            this.lastCallerUtteranceSequence = row.sequence
+          }
+        }
         this.log.info(
           { sessionId: this.deps.transport.sessionId, role: event.role, text: event.text },
           'session.transcript'
@@ -237,7 +249,9 @@ export class VoiceSession {
     })
 
     const needsDelegation = parsed.some((entry) => entry.query !== '')
+    const contextSegments = needsDelegation ? this.takeContextSegments() : []
     if (needsDelegation) {
+      this.clearThinkSpeechSuppress()
       this.enqueueSpeech('filler')
       this.fillerSoundState = 'armed'
       this.sessionLog({ sessionId }, 'session.filler_sound_armed')
@@ -261,7 +275,8 @@ export class VoiceSession {
         turn_id: `${turnId}:${index}`,
         session_id: sessionId,
         caller_number: transport.callerNumber,
-        caller_utterance: this.lastCallerUtterance ?? null
+        caller_utterance: this.lastCallerUtterance ?? null,
+        context_segments: contextSegments
       })
 
       this.sessionLog(
@@ -569,6 +584,7 @@ export class VoiceSession {
       return
     }
 
+    this.clearThinkSpeechSuppress()
     this.deps.agent.injectAgentMessage(pending.text)
     this.enqueueSpeech('answer')
 
@@ -588,6 +604,42 @@ export class VoiceSession {
     }
 
     this.armTransferIfRequested(pending.results)
+  }
+
+  /**
+   * Unsent caller / front-desk turns strictly before the utterance that
+   * triggered this delegation. The triggering row is omitted: the API
+   * persists `query` as that turn's user message. Delegated answers are
+   * omitted because AgentRuntime already wrote them.
+   */
+  private takeContextSegments(): Array<DelegationContextSegment> {
+    const cutoff = this.lastCallerUtteranceSequence
+    const delta: Array<DelegationContextSegment> = []
+    for (const segment of this.transcriptBuffer) {
+      if (segment.sequence <= this.lastMirroredSequence) {
+        continue
+      }
+      if (cutoff !== undefined && segment.sequence >= cutoff) {
+        continue
+      }
+      if (segment.source !== 'stt' && segment.source !== 'fast_model') {
+        continue
+      }
+
+      delta.push({
+        sequence: segment.sequence,
+        role: segment.role,
+        text: segment.text,
+        source: segment.source,
+        occurred_at: segment.occurred_at
+      })
+    }
+
+    if (cutoff !== undefined) {
+      this.lastMirroredSequence = cutoff
+    }
+
+    return delta
   }
 
   private pushTranscript(segment: Omit<TranscriptSegment, 'sequence' | 'occurred_at'>): TranscriptSegment {

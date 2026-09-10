@@ -15,10 +15,22 @@ export function entryMatches(entry: EventLogEntry, matcher: LogMatcher): boolean
   for (const [key, value] of Object.entries(matcher)) {
     if (key === 'before' || key === 'exactly') continue
     if (value === undefined) continue
-    if (entry[key] !== value) return false
+    if (!valuesEqual(entry[key], value)) return false
   }
 
   return true
+}
+
+function valuesEqual(left: unknown, right: unknown): boolean {
+  if (left === right) {
+    return true
+  }
+
+  if (Array.isArray(left) && Array.isArray(right)) {
+    return left.length === right.length && left.every((item, index) => item === right[index])
+  }
+
+  return false
 }
 
 export function assertFixtureLog(
@@ -75,7 +87,11 @@ export function assertFixtureLog(
     }
 
     for (const entry of matched) {
-      const text = [entry.content, entry.greeting, entry.prompt]
+      const pieces: Array<unknown> = [entry.content, entry.greeting, entry.prompt]
+      if (Array.isArray(entry.contextTexts)) {
+        pieces.push(...entry.contextTexts)
+      }
+      const text = pieces
         .filter((value): value is string => typeof value === 'string')
         .join('\n')
       for (const needle of notContaining) {

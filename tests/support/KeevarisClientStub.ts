@@ -36,7 +36,8 @@ export class KeevarisClientStub implements DelegationClient {
       kind: 'ask',
       callerUtterance: request.caller_utterance,
       query: request.query,
-      turnId: request.turn_id
+      turnId: request.turn_id,
+      contextTexts: request.context_segments.map((segment) => segment.text)
     })
 
     const finish = (response: DelegationResponse): DelegationResponse => {

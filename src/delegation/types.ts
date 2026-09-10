@@ -1,4 +1,16 @@
 /**
+ * Caller / front-desk turns the API has not yet seen. Delegated answers
+ * are omitted — AgentRuntime already persisted those itself.
+ */
+export interface DelegationContextSegment {
+  sequence: number
+  role: 'caller' | 'agent'
+  text: string
+  source: 'stt' | 'fast_model'
+  occurred_at: string
+}
+
+/**
  * Body accepted by `unit-hq-api`'s `POST /api/voice/bridge/{bridgeToken}`
  * (the flat HTTP contract; see VoiceBridgeWireFormat::parseHttp).
  */
@@ -8,6 +20,7 @@ export interface DelegationRequest {
   session_id: string
   caller_number: string | null
   caller_utterance: string | null
+  context_segments: Array<DelegationContextSegment>
 }
 
 /**

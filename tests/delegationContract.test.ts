@@ -18,7 +18,16 @@ const requestSchema = z.object({
   turn_id: z.string(),
   session_id: z.string(),
   caller_number: z.string().nullable(),
-  caller_utterance: z.string().nullable()
+  caller_utterance: z.string().nullable(),
+  context_segments: z.array(
+    z.object({
+      sequence: z.number().int().positive(),
+      role: z.enum(['caller', 'agent']),
+      text: z.string(),
+      source: z.enum(['stt', 'fast_model']),
+      occurred_at: z.string()
+    })
+  )
 })
 
 const request = {
@@ -26,7 +35,8 @@ const request = {
   turn_id: 'fc_1',
   session_id: 'sess_contract',
   caller_number: '+15555550100',
-  caller_utterance: 'what are your hours, like, today?'
+  caller_utterance: 'what are your hours, like, today?',
+  context_segments: []
 }
 
 const TEST_CREDENTIALS = {

@@ -1,0 +1,204 @@
+{
+  "name": "transcript-context-sent-to-delegation",
+  "note": "V7. The first ask carries every unsent caller/front-desk turn before the triggering utterance (greeting, language switch, local replies) and never the triggering row. The second ask carries only what happened since the watermark — filler plus a later local exchange — and never the first delegated answer or the second triggering utterance.",
+  "delegation": {
+    "delayMs": 80,
+    "responses": [
+      {
+        "text": "We have eight unit sizes available right now.",
+        "transfer": false
+      },
+      {
+        "text": "The 12 m² unit is €183.92 per month all-in.",
+        "transfer": false
+      }
+    ]
+  },
+  "events": [
+    { "at": 0, "from": "agentSocket", "kind": "open" },
+    { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
+    { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
+    {
+      "at": 20,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "assistant",
+        "content": "Soy un asistente automatizado de Keevaris Madrid."
+      }
+    },
+    {
+      "at": 40,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "user",
+        "content": "Could you please speak more English?"
+      }
+    },
+    {
+      "at": 50,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "assistant",
+        "content": "Of course, I can certainly speak in English."
+      }
+    },
+    {
+      "at": 60,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "assistant",
+        "content": "How can I help you today?"
+      }
+    },
+    {
+      "at": 80,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "user",
+        "content": "I want this to rent and give me the storage."
+      }
+    },
+    {
+      "at": 100,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "FunctionCallRequest",
+        "functions": [
+          {
+            "id": "fc_1",
+            "name": "ask_keevaris",
+            "arguments": "{\"query\":\"I want this to rent and give me the storage.\"}",
+            "client_side": true
+          }
+        ]
+      }
+    },
+    {
+      "at": 150,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "assistant",
+        "content": "Let me check that for you."
+      }
+    },
+    { "at": 200, "from": "agentSocket", "kind": "audio", "bytes": 320 },
+    { "at": 300, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } },
+    { "at": 1100, "from": "clock", "kind": "advance" },
+    { "at": 1150, "from": "agentSocket", "kind": "audio", "bytes": 320 },
+    { "at": 1200, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } },
+    {
+      "at": 1300,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "user",
+        "content": "Thanks"
+      }
+    },
+    {
+      "at": 1350,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "assistant",
+        "content": "You're welcome."
+      }
+    },
+    {
+      "at": 1400,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "user",
+        "content": "What sizes do you have?"
+      }
+    },
+    {
+      "at": 1450,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "FunctionCallRequest",
+        "functions": [
+          {
+            "id": "fc_2",
+            "name": "ask_keevaris",
+            "arguments": "{\"query\":\"What sizes do you have?\"}",
+            "client_side": true
+          }
+        ]
+      }
+    },
+    {
+      "at": 1500,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "assistant",
+        "content": "Let me check that for you."
+      }
+    },
+    { "at": 1550, "from": "agentSocket", "kind": "audio", "bytes": 320 },
+    { "at": 1600, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } },
+    { "at": 2500, "from": "clock", "kind": "advance" },
+    { "at": 2550, "from": "agentSocket", "kind": "audio", "bytes": 320 },
+    { "at": 2600, "from": "caller", "kind": "close", "reason": "caller_hangup" }
+  ],
+  "expect": [
+    {
+      "on": "delegation",
+      "kind": "ask",
+      "query": "I want this to rent and give me the storage.",
+      "contextTexts": [
+        "Soy un asistente automatizado de Keevaris Madrid.",
+        "Could you please speak more English?",
+        "Of course, I can certainly speak in English.",
+        "How can I help you today?"
+      ]
+    },
+    {
+      "on": "delegation",
+      "kind": "ask",
+      "query": "What sizes do you have?",
+      "contextTexts": [
+        "Let me check that for you.",
+        "Thanks",
+        "You're welcome."
+      ]
+    }
+  ],
+  "forbidContent": [
+    {
+      "on": "delegation",
+      "kind": "ask",
+      "query": "I want this to rent and give me the storage.",
+      "notContaining": ["I want this to rent and give me the storage."]
+    },
+    {
+      "on": "delegation",
+      "kind": "ask",
+      "query": "What sizes do you have?",
+      "notContaining": ["We have eight unit sizes available right now.", "What sizes do you have?"]
+    }
+  ],
+  "count": [
+    { "on": "delegation", "kind": "ask", "exactly": 2 }
+  ]
+}
