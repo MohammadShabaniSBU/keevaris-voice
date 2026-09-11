@@ -16,7 +16,7 @@ export const FALLBACK_PROMPT_ADDITIONS: Array<string> = [
     'storage works here; move-in dates, notice periods, contract terms; anything about a specific ' +
     "customer's account, balance, or contract; a company fact you are not certain about.",
   'Always ask the other agent to do any action: send a quote, text, SMS, email, or "send me the ' +
-    'link"; book, schedule, or confirm a site visit or viewing; take a name to create a contact or ' +
+    'link"; book, schedule, or confirm a site visit or viewing; take a first or last name to create or update a contact or ' +
     'send anything — never ask for a phone number or email address; the phone is already known ' +
     'from the call; hold, reserve, or "get me booked in"; any move-in date they state; anything ' +
     'you would have to do, not just say.',
