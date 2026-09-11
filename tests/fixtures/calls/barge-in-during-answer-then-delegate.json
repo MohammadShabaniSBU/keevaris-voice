@@ -1,0 +1,93 @@
+{
+  "name": "barge-in-during-answer-then-delegate",
+  "note": "V5 + V7. Caller barges in while the first delegated answer is still 'speaking'. Speech queue resets so a late AgentAudioDone is not labeled answer (no suppressThinkSpeech). The next ask's queue filler is refused; the second answer must still be injected with interrupt.",
+  "delegation": {
+    "delayMs": 50,
+    "responses": [
+      {
+        "text": "We are open from 8am to 6pm.",
+        "transfer": false
+      },
+      {
+        "text": "A 10 by 10 is 89 a month.",
+        "transfer": false
+      }
+    ]
+  },
+  "events": [
+    { "at": 0, "from": "agentSocket", "kind": "open" },
+    { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
+    { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
+    {
+      "at": 50,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "user",
+        "content": "what are your hours?"
+      }
+    },
+    {
+      "at": 100,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "FunctionCallRequest",
+        "functions": [
+          {
+            "id": "fc_1",
+            "name": "ask_keevaris",
+            "arguments": "{\"query\":\"what are your hours?\"}",
+            "client_side": true
+          }
+        ]
+      }
+    },
+    { "at": 120, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } },
+    { "at": 160, "from": "clock", "kind": "advance" },
+    { "at": 180, "from": "agentSocket", "kind": "control", "message": { "type": "UserStartedSpeaking" } },
+    { "at": 200, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } },
+    {
+      "at": 220,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "user",
+        "content": "how much is a 10 by 10?"
+      }
+    },
+    {
+      "at": 250,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "FunctionCallRequest",
+        "functions": [
+          {
+            "id": "fc_2",
+            "name": "ask_keevaris",
+            "arguments": "{\"query\":\"how much is a 10 by 10?\"}",
+            "client_side": true
+          }
+        ]
+      }
+    },
+    { "at": 260, "from": "agentSocket", "kind": "control", "message": { "type": "InjectionRefused" } },
+    { "at": 320, "from": "clock", "kind": "advance" },
+    { "at": 360, "from": "caller", "kind": "close", "reason": "caller_hangup" }
+  ],
+  "expect": [
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "behavior": "interrupt", "content": "We are open from 8am to 6pm." },
+    { "on": "session", "kind": "session.user_started_speaking" },
+    { "on": "session", "kind": "session.filler_inject_refused" },
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "behavior": "interrupt", "content": "A 10 by 10 is 89 a month." },
+    { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse", "functionCallId": "fc_2" }
+  ],
+  "count": [
+    { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse", "exactly": 2 },
+    { "on": "session", "kind": "session.think_speech_suppressed", "exactly": 0 },
+    { "on": "session", "kind": "session.filler_inject_refused", "exactly": 1 }
+  ]
+}

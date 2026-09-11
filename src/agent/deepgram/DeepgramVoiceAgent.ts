@@ -3,7 +3,7 @@ import { config } from '../../config.js'
 import { logger } from '../../logger.js'
 import type { DependencyHealthReporter } from '../../server/DependencyHealth.js'
 import type { AudioFormat } from '../../transport/Transport.js'
-import type { AgentEvent, AgentProvider } from '../AgentProvider.js'
+import type { AgentEvent, AgentProvider, InjectBehavior } from '../AgentProvider.js'
 import { buildSettingsMessage } from './settings.js'
 
 const DEEPGRAM_AGENT_URL = 'wss://agent.deepgram.com/v1/agent/converse'
@@ -156,8 +156,8 @@ export class DeepgramVoiceAgent implements AgentProvider {
     }
   }
 
-  injectAgentMessage(text: string): void {
-    this.send({ type: 'InjectAgentMessage', behavior: 'queue', message: text })
+  injectAgentMessage(text: string, behavior: InjectBehavior = 'queue'): void {
+    this.send({ type: 'InjectAgentMessage', behavior, message: text })
   }
 
   respondToFunctionCall(id: string, name: string, output: string): void {
@@ -213,12 +213,10 @@ export class DeepgramVoiceAgent implements AgentProvider {
 
         return false
       case 'InjectionRefused':
-        // `behavior: 'queue'` still refuses when the caller is mid-speech.
-        // The answer then never reaches the caller even though the think
-        // model already received the "Answered" stub. Not solved here —
-        // emitting `'error'` would tear the whole call down over one
-        // dropped injection.
+        // `queue` refuses while the caller is mid-turn. VoiceSession
+        // unsticks the filler wait; do not emit `error` or the call dies.
         this.log.warn({}, 'deepgram.injection_refused')
+        this.emit({ type: 'injectionRefused' })
 
         return false
       case 'Error': {

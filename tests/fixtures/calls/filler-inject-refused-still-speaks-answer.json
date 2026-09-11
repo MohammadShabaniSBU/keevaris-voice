@@ -1,0 +1,58 @@
+{
+  "name": "filler-inject-refused-still-speaks-answer",
+  "note": "V5 + V7. queue filler is refused while the caller is mid-turn. Without skipFiller the session stays armed and never sends the answer InjectAgentMessage or FunctionCallResponse.",
+  "delegation": {
+    "delayMs": 80,
+    "response": {
+      "text": "We are open from 8am to 6pm.",
+      "transfer": false
+    }
+  },
+  "events": [
+    { "at": 0, "from": "agentSocket", "kind": "open" },
+    { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
+    { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
+    {
+      "at": 50,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "ConversationText",
+        "role": "user",
+        "content": "what are your hours?"
+      }
+    },
+    {
+      "at": 100,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "FunctionCallRequest",
+        "functions": [
+          {
+            "id": "fc_1",
+            "name": "ask_keevaris",
+            "arguments": "{\"query\":\"what are your hours?\"}",
+            "client_side": true
+          }
+        ]
+      }
+    },
+    { "at": 130, "from": "agentSocket", "kind": "control", "message": { "type": "InjectionRefused" } },
+    { "at": 200, "from": "clock", "kind": "advance" },
+    { "at": 250, "from": "caller", "kind": "close", "reason": "caller_hangup" }
+  ],
+  "expect": [
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "behavior": "queue", "content": "Let me check that for you." },
+    { "on": "session", "kind": "session.filler_inject_refused" },
+    { "on": "delegation", "kind": "ask_done", "turnId": "sess_fixture:1:0" },
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "behavior": "interrupt", "content": "We are open from 8am to 6pm." },
+    { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse" }
+  ],
+  "count": [
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "exactly": 2 },
+    { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse", "exactly": 1 },
+    { "on": "session", "kind": "session.filler_sound_started", "exactly": 0 },
+    { "on": "session", "kind": "session.think_speech_suppressed", "exactly": 0 }
+  ]
+}

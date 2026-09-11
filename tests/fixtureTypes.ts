@@ -50,7 +50,8 @@ export const logMatcherSchema = z.object({
   source: z.string().optional(),
   sequence: z.number().optional(),
   fillerSpoken: z.boolean().optional(),
-  roundTripMs: z.number().optional()
+  roundTripMs: z.number().optional(),
+  behavior: z.string().optional()
 })
 
 const contentGuardSchema = z.object({

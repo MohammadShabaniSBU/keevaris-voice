@@ -46,12 +46,14 @@ export class DeepgramSocketDouble implements DeepgramSocket {
     let content: string | undefined
     let greeting: string | undefined
     let prompt: string | undefined
+    let behavior: string | undefined
     try {
       const parsed = JSON.parse(data) as {
         type?: unknown
         id?: unknown
         message?: unknown
         content?: unknown
+        behavior?: unknown
         agent?: { greeting?: unknown; think?: { prompt?: unknown } }
       }
       if (typeof parsed.type === 'string') {
@@ -67,6 +69,9 @@ export class DeepgramSocketDouble implements DeepgramSocket {
       }
       greeting = typeof parsed.agent?.greeting === 'string' ? parsed.agent.greeting : undefined
       prompt = typeof parsed.agent?.think?.prompt === 'string' ? parsed.agent.think.prompt : undefined
+      if (typeof parsed.behavior === 'string') {
+        behavior = parsed.behavior
+      }
     } catch {
       messageType = 'unparseable'
     }
@@ -78,7 +83,8 @@ export class DeepgramSocketDouble implements DeepgramSocket {
       ...(functionCallId !== undefined ? { functionCallId } : {}),
       ...(content !== undefined ? { content } : {}),
       ...(greeting !== undefined ? { greeting } : {}),
-      ...(prompt !== undefined ? { prompt } : {})
+      ...(prompt !== undefined ? { prompt } : {}),
+      ...(behavior !== undefined ? { behavior } : {})
     })
   }
 

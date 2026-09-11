@@ -271,10 +271,19 @@ test('injectAgentMessage sends queue behavior and the message field', async () =
     behavior: 'queue',
     message: 'some text'
   })
+
+  agent.injectAgentMessage('the answer', 'interrupt')
+  const interrupted = socket.sentTextFrames[socket.sentTextFrames.length - 1]
+  assert.equal(typeof interrupted, 'string')
+  assert.deepEqual(JSON.parse(interrupted as string), {
+    type: 'InjectAgentMessage',
+    behavior: 'interrupt',
+    message: 'the answer'
+  })
   await agent.close()
 })
 
-test('InjectionRefused does not emit an AgentEvent', async () => {
+test('InjectionRefused emits injectionRefused', async () => {
   const log = new EventLog()
   let socket: DeepgramSocketDouble | undefined
 
@@ -301,7 +310,7 @@ test('InjectionRefused does not emit an AgentEvent', async () => {
   socket.sendControl({ type: 'InjectionRefused' })
   await drain()
 
-  assert.deepEqual(received, [])
+  assert.deepEqual(received, [{ type: 'injectionRefused' }])
   await agent.close()
 })
 

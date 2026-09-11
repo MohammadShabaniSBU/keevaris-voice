@@ -42,6 +42,9 @@ type FillerSoundState = 'idle' | 'armed' | 'playing'
 /** Audible floor after the spoken filler's AgentAudioDone before the answer is injected. */
 export const FILLER_SOUND_MIN_MS = 800
 
+/** If filler's AgentAudioDone never arrives (lost after barge-in), skip the wait. */
+export const FILLER_INJECT_WATCHDOG_MS = 2_000
+
 interface PendingAnswer {
   text: string
   results: Array<DelegationResultForCall>
@@ -94,6 +97,7 @@ export class VoiceSession {
   private fillerSoundState: FillerSoundState = 'idle'
   private pendingAnswer: PendingAnswer | undefined
   private fillerSoundMinHoldTimer: ReturnType<typeof setTimeout> | undefined
+  private fillerInjectWatchdogTimer: ReturnType<typeof setTimeout> | undefined
   /**
    * After a delegated answer's own AgentAudioDone, Deepgram's think model
    * still gets FunctionCallResponse and often speaks again. Drop that
@@ -168,6 +172,7 @@ export class VoiceSession {
           'session.user_started_speaking'
         )
         this.deps.transport.clearAudio()
+        this.resetSpeechQueue()
         this.stopFillerSound('barge_in')
         if (this.pendingAnswer !== undefined) {
           this.deliverAnswer(this.pendingAnswer)
@@ -211,6 +216,9 @@ export class VoiceSession {
         break
       case 'agentAudioDone':
         this.handleAgentAudioDone()
+        break
+      case 'injectionRefused':
+        this.skipFiller('refused')
         break
       case 'error':
         this.log.error(
@@ -256,6 +264,7 @@ export class VoiceSession {
       this.fillerSoundState = 'armed'
       this.sessionLog({ sessionId }, 'session.filler_sound_armed')
       agent.injectAgentMessage(this.deps.filler)
+      this.armFillerInjectWatchdog()
     }
 
     const results: Array<DelegationResultForCall> = []
@@ -365,6 +374,7 @@ export class VoiceSession {
     this.speech = this.upcomingSpeech.shift() ?? 'nothing'
 
     if (completed === 'filler' && this.fillerSoundState === 'armed') {
+      this.clearFillerInjectWatchdog()
       this.fillerSoundState = 'playing'
       this.fillerSound.start(this.deps.transport)
       this.sessionLog(
@@ -394,6 +404,40 @@ export class VoiceSession {
     }
 
     this.upcomingSpeech.push(kind)
+  }
+
+  private resetSpeechQueue(): void {
+    this.speech = 'nothing'
+    this.upcomingSpeech.length = 0
+  }
+
+  private dropSpeechKind(kind: SpokenKind): void {
+    if (this.speech === kind) {
+      this.speech = this.upcomingSpeech.shift() ?? 'nothing'
+      return
+    }
+
+    const index = this.upcomingSpeech.indexOf(kind)
+    if (index !== -1) {
+      this.upcomingSpeech.splice(index, 1)
+    }
+  }
+
+  private skipFiller(reason: 'refused' | 'watchdog'): void {
+    if (this.fillerSoundState !== 'armed') {
+      return
+    }
+
+    this.clearFillerInjectWatchdog()
+    this.dropSpeechKind('filler')
+    this.fillerSoundState = 'idle'
+    this.sessionLog(
+      { sessionId: this.deps.transport.sessionId, reason },
+      reason === 'refused' ? 'session.filler_inject_refused' : 'session.filler_inject_watchdog'
+    )
+    if (this.pendingAnswer !== undefined) {
+      this.deliverAnswer(this.pendingAnswer)
+    }
   }
 
   private async completeTransfer(trigger: TransferTrigger): Promise<void> {
@@ -509,6 +553,7 @@ export class VoiceSession {
 
     this.clearTransferDeadline()
     this.clearFillerSoundMinHold()
+    this.clearFillerInjectWatchdog()
   }
 
   private armFillerSoundMinHold(): void {
@@ -519,6 +564,23 @@ export class VoiceSession {
         this.deliverAnswer(this.pendingAnswer)
       }
     }, FILLER_SOUND_MIN_MS)
+  }
+
+  private armFillerInjectWatchdog(): void {
+    this.clearFillerInjectWatchdog()
+    this.fillerInjectWatchdogTimer = setTimeout(() => {
+      this.fillerInjectWatchdogTimer = undefined
+      this.skipFiller('watchdog')
+    }, FILLER_INJECT_WATCHDOG_MS)
+  }
+
+  private clearFillerInjectWatchdog(): void {
+    if (this.fillerInjectWatchdogTimer === undefined) {
+      return
+    }
+
+    clearTimeout(this.fillerInjectWatchdogTimer)
+    this.fillerInjectWatchdogTimer = undefined
   }
 
   private clearThinkSpeechSuppress(): void {
@@ -555,6 +617,7 @@ export class VoiceSession {
     const wasPlaying = this.fillerSound.isPlaying
     const previousState = this.fillerSoundState
     this.clearFillerSoundMinHold()
+    this.clearFillerInjectWatchdog()
     this.fillerSound.stop()
     this.fillerSoundState = 'idle'
     if (previousState === 'idle' && !wasPlaying) {
@@ -585,7 +648,7 @@ export class VoiceSession {
     }
 
     this.clearThinkSpeechSuppress()
-    this.deps.agent.injectAgentMessage(pending.text)
+    this.deps.agent.injectAgentMessage(pending.text, 'interrupt')
     this.enqueueSpeech('answer')
 
     if (this.lastCallerUtteranceAt !== undefined && pending.delegatedSegments.length > 0) {

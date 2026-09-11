@@ -1,11 +1,14 @@
 import type { AudioFormat } from '../transport/Transport.js'
 
+export type InjectBehavior = 'queue' | 'interrupt'
+
 export type AgentEvent =
   | { type: 'audio'; chunk: Buffer }
   | { type: 'userStartedSpeaking' }
   | { type: 'transcript'; role: 'user' | 'agent'; text: string }
   | { type: 'functionCalls'; calls: Array<{ id: string; name: string; arguments: string }> }
   | { type: 'agentAudioDone' }
+  | { type: 'injectionRefused' }
   | { type: 'closed'; reason: string }
   | { type: 'error'; message: string }
 
@@ -24,9 +27,11 @@ export interface AgentProvider {
   /**
    * Speak `text` verbatim — filler while a function call is in flight, or
    * the delegated answer itself. Deepgram's think model never sees this
-   * string; it goes out as InjectAgentMessage.
+   * string; it goes out as InjectAgentMessage. Filler uses `queue`; the
+   * delegated answer uses `interrupt` so a still-open user turn cannot
+   * refuse the one sentence we must speak.
    */
-  injectAgentMessage(text: string): void
+  injectAgentMessage(text: string, behavior?: InjectBehavior): void
   respondToFunctionCall(id: string, name: string, output: string): void
   onEvent(handler: (event: AgentEvent) => void): void
   close(): Promise<void>
