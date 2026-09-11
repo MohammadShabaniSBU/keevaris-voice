@@ -1,0 +1,47 @@
+{
+  "name": "filler-sound-survives-slow-delegation",
+  "note": "V5 + V7. ask() takes 6s; filler AgentAudioDone arrives at 3s. An inject-time 2s watchdog would skip filler before the typing clip starts. The answer-ready hold must not fire while ask() is still in flight.",
+  "delegation": {
+    "delayMs": 6000,
+    "response": {
+      "text": "We are open from 8am to 6pm.",
+      "transfer": false
+    }
+  },
+  "events": [
+    { "at": 0, "from": "agentSocket", "kind": "open" },
+    { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
+    { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
+    {
+      "at": 100,
+      "from": "agentSocket",
+      "kind": "control",
+      "message": {
+        "type": "FunctionCallRequest",
+        "functions": [
+          {
+            "id": "fc_1",
+            "name": "ask_keevaris",
+            "arguments": "{\"query\":\"what are your hours?\"}",
+            "client_side": true
+          }
+        ]
+      }
+    },
+    { "at": 3000, "from": "agentSocket", "kind": "control", "message": { "type": "AgentAudioDone" } },
+    { "at": 6200, "from": "clock", "kind": "advance" },
+    { "at": 6300, "from": "caller", "kind": "close", "reason": "caller_hangup" }
+  ],
+  "expect": [
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "behavior": "interrupt", "content": "Let me check that for you." },
+    { "on": "session", "kind": "session.filler_sound_started" },
+    { "on": "transport", "kind": "sendAudio", "bytes": 160 },
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "behavior": "interrupt", "content": "We are open from 8am to 6pm." },
+    { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse" }
+  ],
+  "count": [
+    { "on": "session", "kind": "session.filler_sound_started", "exactly": 1 },
+    { "on": "session", "kind": "session.filler_answer_hold_expired", "exactly": 0 },
+    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "exactly": 2 }
+  ]
+}

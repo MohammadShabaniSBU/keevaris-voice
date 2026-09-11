@@ -1,8 +1,8 @@
 {
-  "name": "filler-inject-refused-still-speaks-answer",
-  "note": "V5 + V7. Defensive: InjectionRefused is still handled even though filler now uses interrupt (never refused). Without skipFiller the session stays armed and never sends the answer InjectAgentMessage or FunctionCallResponse.",
+  "name": "lost-filler-audio-done-bounded-by-hold",
+  "note": "V5 + V7. Filler is injected and the answer is ready, but AgentAudioDone never arrives. After FILLER_ANSWER_HOLD_MAX_MS the session skips the filler wait and still injects the answer.",
   "delegation": {
-    "delayMs": 80,
+    "delayMs": 200,
     "response": {
       "text": "We are open from 8am to 6pm.",
       "transfer": false
@@ -12,16 +12,6 @@
     { "at": 0, "from": "agentSocket", "kind": "open" },
     { "at": 1, "from": "agentSocket", "kind": "control", "message": { "type": "Welcome", "request_id": "req_1" } },
     { "at": 2, "from": "agentSocket", "kind": "control", "message": { "type": "SettingsApplied" } },
-    {
-      "at": 50,
-      "from": "agentSocket",
-      "kind": "control",
-      "message": {
-        "type": "ConversationText",
-        "role": "user",
-        "content": "what are your hours?"
-      }
-    },
     {
       "at": 100,
       "from": "agentSocket",
@@ -38,21 +28,19 @@
         ]
       }
     },
-    { "at": 130, "from": "agentSocket", "kind": "control", "message": { "type": "InjectionRefused" } },
-    { "at": 200, "from": "clock", "kind": "advance" },
-    { "at": 250, "from": "caller", "kind": "close", "reason": "caller_hangup" }
+    { "at": 400, "from": "clock", "kind": "advance" },
+    { "at": 3400, "from": "clock", "kind": "advance" },
+    { "at": 3500, "from": "caller", "kind": "close", "reason": "caller_hangup" }
   ],
   "expect": [
     { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "behavior": "interrupt", "content": "Let me check that for you." },
-    { "on": "session", "kind": "session.filler_inject_refused" },
-    { "on": "delegation", "kind": "ask_done", "turnId": "sess_fixture:1:0" },
+    { "on": "session", "kind": "session.filler_answer_hold_expired" },
     { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "behavior": "interrupt", "content": "We are open from 8am to 6pm." },
     { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse" }
   ],
   "count": [
-    { "on": "agentSocket", "kind": "send", "messageType": "InjectAgentMessage", "exactly": 2 },
-    { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse", "exactly": 1 },
     { "on": "session", "kind": "session.filler_sound_started", "exactly": 0 },
-    { "on": "session", "kind": "session.think_speech_suppressed", "exactly": 0 }
+    { "on": "session", "kind": "session.filler_answer_hold_expired", "exactly": 1 },
+    { "on": "agentSocket", "kind": "send", "messageType": "FunctionCallResponse", "exactly": 1 }
   ]
 }

@@ -27,9 +27,9 @@ export interface AgentProvider {
   /**
    * Speak `text` verbatim — filler while a function call is in flight, or
    * the delegated answer itself. Deepgram's think model never sees this
-   * string; it goes out as InjectAgentMessage. Filler uses `queue`; the
-   * delegated answer uses `interrupt` so a still-open user turn cannot
-   * refuse the one sentence we must speak.
+   * string; it goes out as InjectAgentMessage. Filler and the delegated
+   * answer both use `interrupt`: a queued filler cannot be cancelled and
+   * would be spoken out of context after the answer.
    */
   injectAgentMessage(text: string, behavior?: InjectBehavior): void
   respondToFunctionCall(id: string, name: string, output: string): void
